@@ -28,3 +28,5 @@ end
 %% 使用DPC算法修复坏点
 img_dpc = DPC(image_input, AllDP_Lis);
 figure; imshow(img_dpc);
+% 输出坏点数量
+disp(['坏点数量: ', num2str(size(AllDP_Lis, 1))]);
