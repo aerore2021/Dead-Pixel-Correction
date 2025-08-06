@@ -6,10 +6,11 @@ function AllDP_Lis = ManualDPC(image_input, ManualPixel_input, thres_Med, AutoDP
     for i = 1:h
         for j = 1:w
             % 检查手动标记的像素点是否在自动检测列表中
-            if ismember([i, j], AllDP_Lis, 'rows')
-                continue; % 如果在已有坏点列表中，则跳过
+            if (~isempty(AllDP_Lis) )
+                if ismember([i, j], AllDP_Lis, 'rows')
+                    continue; % 如果在已有坏点列表中，则跳过
+                end
             end
-            
             % 当坐标为手动标记的像素点时，在5乘5邻域作中值滤波判断真实坏点位置
             if ismember([i, j], ManualPixel_input, 'rows')
                 % 获取5x5邻域
@@ -21,10 +22,12 @@ function AllDP_Lis = ManualDPC(image_input, ManualPixel_input, thres_Med, AutoDP
                 
                 % AllDP_Lis中位于window的值
                 AllDP_Lis_obj = [];
-                for k = 1:size(AllDP_Lis, 1)
-                    if AllDP_Lis(k, 1) >= row_start && AllDP_Lis(k, 1) <= row_end && ...
-                       AllDP_Lis(k, 2) >= col_start && AllDP_Lis(k, 2) <= col_end
-                        AllDP_Lis_obj = [AllDP_Lis_obj; [AllDP_Lis(k, 1)-row_start+1, AllDP_Lis(k, 2)-col_start+1]];
+                if (~isempty(AllDP_Lis) )
+                    for k = 1:size(AllDP_Lis, 1)
+                        if AllDP_Lis(k, 1) >= row_start && AllDP_Lis(k, 1) <= row_end && ...
+                           AllDP_Lis(k, 2) >= col_start && AllDP_Lis(k, 2) <= col_end
+                            AllDP_Lis_obj = [AllDP_Lis_obj; [AllDP_Lis(k, 1)-row_start+1, AllDP_Lis(k, 2)-col_start+1]];
+                        end
                     end
                 end
                 ManualPixel_Lis_obj = MedForDPC(window, thres_Med, AllDP_Lis_obj);
