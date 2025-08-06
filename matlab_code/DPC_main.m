@@ -1,10 +1,14 @@
+clear;
 %% 初始化
-hot_uniform = imread();
-cold_uniform = imread();
-image_input = imread(); 
+hot_uniform = imread('D:\FPGA\dpc\matlab_code\inputs\bendi_gaowen.png');
+cold_uniform = imread('D:\FPGA\dpc\matlab_code\inputs\bendi_diwen.png');
+image_input = imread('D:\FPGA\dpc\matlab_code\inputs\reader0.png');
+hot_uniform = reshape(hot_uniform, 640, 512)';
+cold_uniform = reshape(cold_uniform, 640, 512)';
+%image_input = reshape(image_input, 640, 512)';
 hot_temp = 30; % 假设热像素温度为30
 cold_temp = 20; % 假设冷像素温度为20
-thres = 1; 
+thres = 100; 
 thres_Med = 30; 
 DeadPixel_Lis = [];
 StuckPixel_Lis = [];
@@ -27,6 +31,6 @@ end
 
 %% 使用DPC算法修复坏点
 img_dpc = DPC(image_input, AllDP_Lis);
-figure; imshow(img_dpc);
+figure; imshow(img_dpc,[]);
 % 输出坏点数量
 disp(['坏点数量: ', num2str(size(AllDP_Lis, 1))]);

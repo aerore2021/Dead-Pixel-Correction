@@ -24,11 +24,34 @@ function [DeadPixel_Lis, StuckPixel_Lis] = AutoDPC(hot_uniform, cold_uniform, ho
             end
             % 盲元检测
             % 计算当前像素点的k值
-            k_this = k(i, j);
-            k_sum = sum(k_padded(i:i + window_size - 1, j:j + window_size - 1), 'all') - k_this;
-            k_mean = k_sum / (window_size^2 - 1);
-            if abs(k_this - k_mean) > thres
-                StuckPixel_Lis = [StuckPixel_Lis; [i, j]];
+            if (i > pad_size && j > pad_size)
+                if (isempty(DeadPixel_Lis) == 0)
+                    if (ismember([i-pad_size, j-pad_size], DeadPixel_Lis, 'rows'))
+                        continue;
+                    end
+                end
+                k_this = k_padded(i, j);
+                k_vld_vals = [];
+                for ii = i - pad_size:i + pad_size
+                    for jj = j - pad_size:j + pad_size
+                        if (isempty(DeadPixel_Lis) == 0)
+                            if (ismember([ii-pad_size, jj-pad_size], DeadPixel_Lis, 'rows'))
+                                continue; % 跳过坏点
+                            end
+                        elseif (isempty(StuckPixel_Lis) == 0)
+                            if (ismember([ii-pad_size, jj-pad_size], StuckPixel_Lis, 'rows'))
+                                continue; % 跳过盲点
+                            end
+                        elseif (ii == i && jj == j)
+                                continue;
+                        end
+                        k_vld_vals = [k_vld_vals; k_padded(ii, jj)];
+                    end
+                end
+                k_med = median(k_vld_vals);
+                if abs(k_this - k_med) > thres
+                    StuckPixel_Lis = [StuckPixel_Lis; [i-pad_size, j-pad_size]];
+                end
             end
         end
     end
