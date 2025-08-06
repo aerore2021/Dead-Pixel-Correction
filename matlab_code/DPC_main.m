@@ -13,12 +13,57 @@ thres_Med = 30;
 DeadPixel_Lis = [];
 StuckPixel_Lis = [];
 
+%% 人工生成1x2，2x1，1x3，3x1，1+2x1，2x2，3x3，1+2x2的坏点
+% 1x2
+image_input(100, 100:101) = 8192;
+hot_uniform(100, 100:101) = 8192;
+cold_uniform(100, 100:101) = 8192;
+% 2x1
+image_input(150:151, 200) = 8192;
+hot_uniform(150:151, 200) = 8192;
+cold_uniform(150:151, 200) = 8192;
+% 1x3
+image_input(200, 300:302) = 8192;
+hot_uniform(200, 300:302) = 8192;
+cold_uniform(200, 300:302) = 8192;
+% 3x1
+image_input(250:252, 300) = 8192;
+hot_uniform(250:252, 300) = 8192;
+cold_uniform(250:252, 300) = 8192;
+% 1+2x1
+image_input(300, 400:401) = 8192;
+image_input(301, 400) = 8192;
+hot_uniform(300, 400:401) = 8192;
+cold_uniform(300, 400:401) = 8192;
+hot_uniform(301, 400) = 8192;
+cold_uniform(301, 400) = 8192;
+% 2x2
+image_input(350:351, 400:401) = 8192;
+hot_uniform(350:351, 400:401) = 8192;
+cold_uniform(350:351, 400:401) = 8192;
+% 3x3
+image_input(400:402, 400:402) = 8192;
+hot_uniform(400:402, 400:402) = 8192;
+cold_uniform(400:402, 400:402) = 8192;
+% 1+2x2
+image_input(450, 399) = 8192;
+image_input(451:452, 400:401) = 8192;
+hot_uniform(450, 399) = 8192;
+cold_uniform(450, 399) = 8192;
+hot_uniform(451:452, 400:401) = 8192;
+cold_uniform(451:452, 400:401) = 8192;
+% 2x3
+image_input(500:501, 400:402) = 8192;
+hot_uniform(500:501, 400:402) = 8192;
+cold_uniform(500:501, 400:402) = 8192;
+
 %% 自动检测坏点和盲元
 [DeadPixel_Lis, StuckPixel_Lis] = AutoDPC(hot_uniform, cold_uniform, hot_temp, cold_temp, thres);
 AutoDP_Lis = sortrows([DeadPixel_Lis; StuckPixel_Lis]);
 
 %% 手动检测坏点
 % 5x5的范围内标记一个坐标就行，让它尽量保持在中心
+% AutoDP_Lis = [];
 ManualPixel_Lis = [];
 
 if ~isempty(ManualPixel_Lis)
