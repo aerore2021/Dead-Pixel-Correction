@@ -34,8 +34,6 @@ module DPC_Corrector #(
     
     // 配置接口
     input  wire                     enable,          // 模块使能
-    input  wire [CNT_WIDTH-1:0]     frame_width,     // 帧宽度
-    input  wire [CNT_WIDTH-1:0]     frame_height,    // 帧高度
     
     // 坏点列表接口
     input  wire                     S_AXI_ACLK,

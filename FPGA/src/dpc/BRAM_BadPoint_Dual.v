@@ -3,7 +3,7 @@
  * 端口A：配置端口（写入）
  * 端口B：读取端口（查询）
  */
-
+// 后面一零四例化，不用这个
 module BRAM_BadPoint_Dual #(
     parameter ADDR_WIDTH = 7,
     parameter DATA_WIDTH = 32,

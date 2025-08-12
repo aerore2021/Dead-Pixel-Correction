@@ -16,7 +16,8 @@ module DPC_Detector #(
     parameter MANUAL_BP_BIT = 7,             // 手动坏点地址位宽
     parameter AUTO_BP_NUM = 256,             // 自动检测坏点最大数量
     parameter AUTO_BP_BIT = 8,               // 自动检测坏点地址位宽
-    parameter THRESHOLD = 100                // 盲点检测阈值
+    parameter THRESHOLD = 100,               // 盲点检测阈值
+    parameter FRAME_HEIGHT = 512             // 帧高度
 )(
     // 时钟和复位
     input  wire                     aclk,
@@ -42,8 +43,6 @@ module DPC_Detector #(
     
     // 配置接口
     input  wire                     enable,          // 模块使能
-    input  wire [CNT_WIDTH-1:0]     frame_width,     // 帧宽度
-    input  wire [CNT_WIDTH-1:0]     frame_height,    // 帧高度
     input  wire [K_WIDTH-1:0]       k_threshold,     // k值偏差阈值
     
     // 手动坏点表接口
@@ -57,12 +56,12 @@ module DPC_Detector #(
     output reg                      auto_bp_valid,    // 检测到坏点时有效
     output reg [CNT_WIDTH-1:0]      auto_bp_x,        // 坏点X坐标
     output reg [CNT_WIDTH-1:0]      auto_bp_y,        // 坏点Y坐标
-    output reg                      auto_bp_type,     // 坏点类型：0=死点，1=盲点
+    output reg                      auto_bp_type,     // 坏点类型：0=死点，1=盲元
     input  wire                     auto_bp_ready,    // 上位机准备接收
     
     // 检测状态
     output wire                     frame_detection_done,  // 帧检测完成
-    output wire [AUTO_BP_BIT:0]     detected_bp_count,     // 当前帧检测到的坏点数量
+    output wire [AUTO_BP_BIT-1:0]   detected_bp_count,     // 当前帧检测到的坏点数量
     
     // 调试输出
     output wire                     debug_manual_skip,     // 跳过手动坏点
@@ -72,7 +71,7 @@ module DPC_Detector #(
 
     // 内部信号定义
     wire data_valid = s_axis_tvalid & s_axis_tready & k_axis_tvalid;
-    
+    wire [CNT_WIDTH-1:0] frame_height = FRAME_HEIGHT; 
     // 坐标计数器
     reg [CNT_WIDTH-1:0] x_cnt, y_cnt;
     reg frame_start_pulse, frame_end_pulse;
@@ -89,13 +88,8 @@ module DPC_Detector #(
             
             if (s_axis_tlast) begin
                 x_cnt <= 0;
-                if (s_axis_tuser) begin
-                    y_cnt <= 0;
-                    frame_end_pulse <= 0;
-                end else begin
-                    y_cnt <= y_cnt + 1;
-                    frame_end_pulse <= (y_cnt == frame_height - 1);
-                end
+                y_cnt <= y_cnt + 1;
+                frame_end_pulse <= (y_cnt == frame_height - 1);
             end
             else begin
                 x_cnt <= x_cnt + 1;
@@ -331,97 +325,5 @@ module DPC_Detector #(
     assign debug_manual_skip = t4_manual_skip;
     assign debug_dead_pixel = t4_dead_pixel;
     assign debug_stuck_pixel = t4_stuck_pixel;
-
-endmodule
-
-
-// ================================================================
-// 手动坏点检查模块
-// ================================================================
-module Manual_BadPixel_Checker #(
-    parameter WIDTH_BITS = 10,
-    parameter HEIGHT_BITS = 10,
-    parameter BAD_POINT_NUM = 128,
-    parameter BAD_POINT_BIT = 7
-)(
-    input clk,
-    input rst_n,
-    input S_AXI_ACLK,
-    
-    // 当前处理位置
-    input [WIDTH_BITS-1:0] current_x,
-    input [HEIGHT_BITS-1:0] current_y,
-    input frame_start,
-    
-    // 手动坏点表配置
-    input [BAD_POINT_BIT-1:0] bad_point_num,
-    input wen_lut,
-    input [BAD_POINT_BIT-1:0] waddr_lut,
-    input [31:0] wdata_lut,
-    
-    // 输出
-    output bad_pixel_match,
-    output [WIDTH_BITS-1:0] next_bad_x,
-    output [HEIGHT_BITS-1:0] next_bad_y
-);
-
-    // 读地址和控制
-    reg [BAD_POINT_BIT-1:0] raddr;
-    reg re;
-    reg re_frame_start;
-    wire [31:0] rdata;
-    wire [WIDTH_BITS-1:0] bad_x = rdata[31:16];
-    wire [HEIGHT_BITS-1:0] bad_y = rdata[15:0];
-    
-    // 读取控制逻辑
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            raddr <= 0;
-            re_frame_start <= 1;
-            re <= 0;
-        end
-        else begin
-            re_frame_start <= frame_start;
-            
-            if (frame_start && !re_frame_start) begin
-                // 帧开始，重置读地址
-                raddr <= 0;
-                re <= 1;
-            end
-            else if (bad_pixel_match && raddr < bad_point_num) begin
-                // 匹配到坏点，读取下一个
-                raddr <= raddr + 1;
-                re <= 1;
-            end
-            else begin
-                re <= 0;
-            end
-        end
-    end
-    
-    // 坏点匹配判断
-    assign bad_pixel_match = (current_x == bad_x) && (current_y == bad_y) && (raddr < bad_point_num);
-    assign next_bad_x = bad_x;
-    assign next_bad_y = bad_y;
-    
-    // BRAM例化
-    BRAM_BadPoint_Dual #(
-        .ADDR_WIDTH(BAD_POINT_BIT),
-        .DATA_WIDTH(32),
-        .DEPTH(BAD_POINT_NUM)
-    ) BRAM_inst (
-        .clka(S_AXI_ACLK),
-        .ena(1'b1),
-        .wea(wen_lut),
-        .addra(waddr_lut),
-        .dina(wdata_lut),
-        
-        .clkb(clk),
-        .enb(re),
-        .web(1'b0),
-        .addrb(raddr),
-        .dinb(32'h0),
-        .doutb(rdata)
-    );
 
 endmodule
