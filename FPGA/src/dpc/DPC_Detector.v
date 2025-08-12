@@ -17,7 +17,8 @@ module DPC_Detector #(
     parameter AUTO_BP_NUM = 256,             // 自动检测坏点最大数量
     parameter AUTO_BP_BIT = 8,               // 自动检测坏点地址位宽
     parameter THRESHOLD = 100,               // 盲点检测阈值
-    parameter FRAME_HEIGHT = 512             // 帧高度
+    parameter FRAME_HEIGHT = 512,            // 帧高度
+    parameter FRAME_WIDTH = 640              // 帧宽度
 )(
     // 时钟和复位
     input  wire                     aclk,
@@ -139,34 +140,101 @@ module DPC_Detector #(
     // k值窗口缓存 (3x3)
     // ================================================================
     
-    reg [K_WIDTH-1:0] k_line_buffer1 [0:1023];
-    reg [K_WIDTH-1:0] k_line_buffer2 [0:1023];
-    
+    reg [K_WIDTH-1:0] k_line_buffer1;
+    reg [K_WIDTH-1:0] k_line_buffer2;
+
+    reg [K_WIDTH-1:0] k_line_buffer1_r [0:2];
+    reg [K_WIDTH-1:0] k_line_buffer2_r [0:2];
+    reg [K_WIDTH-1:0] k_axis_tdata_r [0:2];
+
     // 3x3 k值窗口
     reg [K_WIDTH-1:0] k11, k12, k13;
     reg [K_WIDTH-1:0] k21, k22, k23;
     reg [K_WIDTH-1:0] k31, k32, k33;
-    
-    // 窗口移位逻辑
+
+    reg [K_WIDTH-1:0] k11_r, k12_r, k13_r;
+    reg [K_WIDTH-1:0] k21_r, k22_r, k23_r;
+    reg [K_WIDTH-1:0] k31_r, k32_r, k33_r;
+
     always @(posedge aclk) begin
-        if (data_valid) begin
-            // k值窗口更新
-            k11 <= k_line_buffer2[x_cnt];
-            k12 <= k_line_buffer1[x_cnt];
-            k13 <= k_axis_tdata;
-            
-            k21 <= k_line_buffer2[x_cnt+1];
-            k22 <= k_line_buffer1[x_cnt+1];
-            k23 <= k13;
-            
-            k31 <= k_line_buffer2[x_cnt+2];
-            k32 <= k_line_buffer1[x_cnt+2];
-            k33 <= k23;
-            
-            // k值Line buffer更新
-            k_line_buffer2[x_cnt] <= k_line_buffer1[x_cnt];
-            k_line_buffer1[x_cnt] <= k_axis_tdata;
-        end
+        k_line_buffer1_r[2] <= k_line_buffer1;
+        k_line_buffer1_r[1] <= k_line_buffer1_r[2];
+        k_line_buffer1_r[0] <= k_line_buffer1_r[1];
+
+        k_line_buffer2_r[2] <= k_line_buffer2;
+        k_line_buffer2_r[1] <= k_line_buffer2_r[2];
+        k_line_buffer2_r[0] <= k_line_buffer2_r[1];
+
+        k_axis_tdata_r[2] <= k_axis_tdata;
+        k_axis_tdata_r[1] <= k_axis_tdata_r[2];
+        k_axis_tdata_r[0] <= k_axis_tdata_r[1];
+    end
+
+    LineBuf_dpc #(
+        .WIDTH   	(K_WIDTH   ),
+        .LATENCY 	(FRAME_WIDTH  ))
+    u_LineBuf_k_1(
+        .reset    	(aresetn     ),
+        .clk      	(aclk       ),
+        .in_valid 	(k_axis_tvalid  ),
+        .data_in  	(k_axis_tdata   ),
+        .data_out 	(k_line_buffer1  )
+    );
+    
+    LineBuf_dpc #(
+        .WIDTH   	(K_WIDTH   ),
+        .LATENCY 	(FRAME_WIDTH  ))
+    u_LineBuf_dpc(
+        .reset    	(aresetn     ),
+        .clk      	(aclk       ),
+        .in_valid 	(k_axis_tvalid  ),
+        .data_in  	(k_line_buffer1   ),
+        .data_out 	(k_line_buffer2  )
+    );
+
+    wire is_first_row, is_last_row, is_first_col, is_last_col;
+    wire is_sec_row, is_last_sec_row, is_sec_col, is_last_sec_col;
+    reg is_sec_row_r, is_last_sec_row_r;
+
+    assign is_first_row = (y_cnt == 0);
+    assign is_last_row = (y_cnt == FRAME_HEIGHT - 1);
+    assign is_first_col = (x_cnt == 0);
+    assign is_last_col = (x_cnt == FRAME_WIDTH - 1);
+
+    assign is_sec_row = (y_cnt == 1);
+    assign is_last_sec_row = (y_cnt == FRAME_HEIGHT - 2);
+    assign is_sec_col = (x_cnt == 1);
+    assign is_last_sec_col = (x_cnt == FRAME_WIDTH - 2);
+
+    // 窗口移位逻辑: LATENCY_PADDING = 2
+    always @(posedge aclk) begin
+        // step 1
+        k11_r <= (is_sec_col) ? k_line_buffer2_r[1] : k_line_buffer2_r[0];
+        k21_r <= (is_sec_col) ? k_line_buffer1_r[1] : k_line_buffer1_r[0];
+        k31_r <= (is_sec_col) ? k_axis_tdata_r[1] : k_axis_tdata_r[0];
+
+        k12_r <= k_line_buffer2_r[1];
+        k22_r <= k_line_buffer1_r[1];
+        k32_r <= k_axis_tdata_r[1];
+
+        k13_r <= (is_last_sec_col) ? k_line_buffer2_r[1] : k_line_buffer2_r[2];
+        k23_r <= (is_last_sec_col) ? k_line_buffer1_r[1] : k_line_buffer1_r[2];
+        k33_r <= (is_last_sec_col) ? k_axis_tdata_r[1] : k_axis_tdata_r[2];
+        // step 2
+        k11 <= (is_sec_row_r) ? k21_r : k11_r;
+        k12 <= (is_sec_row_r) ? k22_r : k12_r;
+        k13 <= (is_sec_row_r) ? k23_r : k13_r;
+
+        k21 <= k21_r;
+        k22 <= k22_r;
+        k23 <= k23_r;
+
+        k31 <= (is_last_sec_row_r) ? k21_r : k31_r;
+        k32 <= (is_last_sec_row_r) ? k22_r : k32_r;
+        k33 <= (is_last_sec_row_r) ? k23_r : k33_r;
+    
+        is_sec_row_r <= is_sec_row;
+        is_last_sec_row_r <= is_last_sec_row;
     end
 
     // ================================================================

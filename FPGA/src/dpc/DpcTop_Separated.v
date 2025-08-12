@@ -275,7 +275,8 @@ module DpcTop_Separated #(
                  .AUTO_BP_NUM(MAX_ALL_BP),
                  .AUTO_BP_BIT(7),
                  .THRESHOLD(K_THRESHOLD_DEFAULT),
-                 .FRAME_HEIGHT(FRAME_HEIGHT)
+                 .FRAME_HEIGHT(FRAME_HEIGHT),
+                 .FRAME_WIDTH(FRAME_WIDTH)
                ) detector_inst (
                  .aclk                       (axis_aclk),
                  .aresetn                    (axis_aresetn),
