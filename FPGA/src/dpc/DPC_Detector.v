@@ -6,6 +6,8 @@
  * 2. 跳过手动坏点列表中的像素
  * 3. 将检测到的坏点坐标输出给上位机
  * 4. 不进行校正，只做检测
+
+ * > 输出的k是窗口的中心，而不是右下角
  */
 
 module DPC_Detector #(
@@ -42,6 +44,10 @@ module DPC_Detector #(
     output wire                     m_axis_tuser,
     output wire                     m_axis_tlast,
     
+    // 输出k值流 (带坏点标志位)
+    output wire                     k_out_tvalid,
+    output wire [K_WIDTH-1:0]       k_out_tdata,    // 最高位为坏点标志，低位为k值
+    
     // 配置接口
     input  wire                     enable,          // 模块使能
     input  wire [K_WIDTH-1:0]       k_threshold,     // k值偏差阈值
@@ -54,25 +60,28 @@ module DPC_Detector #(
     input  wire [31:0]              manual_wdata,
     
     // 自动检测坏点输出接口
-    output reg                      auto_bp_valid,    // 检测到坏点时有效
+    output wire                     auto_bp_valid,    // 检测到坏点时有效
     output reg [CNT_WIDTH-1:0]      auto_bp_x,        // 坏点X坐标
     output reg [CNT_WIDTH-1:0]      auto_bp_y,        // 坏点Y坐标
-    output reg                      auto_bp_type,     // 坏点类型：0=死点，1=盲元
-    input  wire                     auto_bp_ready,    // 上位机准备接收
     
     // 检测状态
     output wire                     frame_detection_done,  // 帧检测完成
-    output wire [AUTO_BP_BIT-1:0]   detected_bp_count,     // 当前帧检测到的坏点数量
-    
-    // 调试输出
-    output wire                     debug_manual_skip,     // 跳过手动坏点
-    output wire                     debug_dead_pixel,      // 检测到死点
-    output wire                     debug_stuck_pixel      // 检测到盲点
+    output wire [AUTO_BP_BIT-1:0]   detected_bp_count     // 当前帧检测到的坏点数量
 );
+    localparam LATENCY_CENTER = FRAME_WIDTH + 1; // 从右下角到中心
+    localparam LATENCY_PADDING = 2; // padding带来的延时
+    localparam LATENCY_MEDIAN = 3; // 中值延时
+    localparam LATENCY_K_VLD = 1; // 得到有效k数组的延时
+    localparam LATENCY_TOTAL = LATENCY_CENTER + LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
 
     // 内部信号定义
     wire data_valid = s_axis_tvalid & s_axis_tready & k_axis_tvalid;
-    wire [CNT_WIDTH-1:0] frame_height = FRAME_HEIGHT; 
+    wire [CNT_WIDTH-1:0] frame_height = FRAME_HEIGHT;
+    wire [CNT_WIDTH-1:0] frame_width = FRAME_WIDTH;
+    
+    // 输入k值没有标志位，在处理过程中添加标志位
+    wire [K_WIDTH-1:0] k_value_in = k_axis_tdata;  // 输入的完整k值
+    
     // 坐标计数器
     reg [CNT_WIDTH-1:0] x_cnt, y_cnt;
     reg frame_start_pulse, frame_end_pulse;
@@ -137,24 +146,29 @@ module DPC_Detector #(
     );
 
     // ================================================================
-    // k值窗口缓存 (3x3)
+    // k值窗口缓存 (3x3):LATENCY=FRAME_WIDTH*2+2
+    // 扩展k值位宽，加入手动坏点标志位
     // ================================================================
     
-    reg [K_WIDTH-1:0] k_line_buffer1;
-    reg [K_WIDTH-1:0] k_line_buffer2;
+    // 为k值添加手动坏点标志位
+    wire [K_WIDTH:0] k_with_manual_flag;  // 扩展1位用于标志位
+    assign k_with_manual_flag = {manual_bp_match|(k_axis_tdata == 'd0), k_axis_tdata}; // 手动要和输入的坐标对齐，以及加入DP检测
+    
+    reg [K_WIDTH:0] k_line_buffer1;
+    reg [K_WIDTH:0] k_line_buffer2;
 
-    reg [K_WIDTH-1:0] k_line_buffer1_r [0:2];
-    reg [K_WIDTH-1:0] k_line_buffer2_r [0:2];
-    reg [K_WIDTH-1:0] k_axis_tdata_r [0:2];
+    reg [K_WIDTH:0] k_line_buffer1_r [0:2];
+    reg [K_WIDTH:0] k_line_buffer2_r [0:2];
+    reg [K_WIDTH:0] k_axis_tdata_r [0:2];
 
     // 3x3 k值窗口
-    reg [K_WIDTH-1:0] k11, k12, k13;
-    reg [K_WIDTH-1:0] k21, k22, k23;
-    reg [K_WIDTH-1:0] k31, k32, k33;
+    reg [K_WIDTH:0] k11, k12, k13;
+    reg [K_WIDTH:0] k21, k22, k23;
+    reg [K_WIDTH:0] k31, k32, k33;
 
-    reg [K_WIDTH-1:0] k11_r, k12_r, k13_r;
-    reg [K_WIDTH-1:0] k21_r, k22_r, k23_r;
-    reg [K_WIDTH-1:0] k31_r, k32_r, k33_r;
+    reg [K_WIDTH:0] k11_r, k12_r, k13_r;
+    reg [K_WIDTH:0] k21_r, k22_r, k23_r;
+    reg [K_WIDTH:0] k31_r, k32_r, k33_r;
 
     always @(posedge aclk) begin
         k_line_buffer1_r[2] <= k_line_buffer1;
@@ -165,24 +179,24 @@ module DPC_Detector #(
         k_line_buffer2_r[1] <= k_line_buffer2_r[2];
         k_line_buffer2_r[0] <= k_line_buffer2_r[1];
 
-        k_axis_tdata_r[2] <= k_axis_tdata;
+        k_axis_tdata_r[2] <= k_with_manual_flag;
         k_axis_tdata_r[1] <= k_axis_tdata_r[2];
         k_axis_tdata_r[0] <= k_axis_tdata_r[1];
     end
 
     LineBuf_dpc #(
-        .WIDTH   	(K_WIDTH   ),
+        .WIDTH   	(K_WIDTH+1   ),  // 增加1位用于标志位
         .LATENCY 	(FRAME_WIDTH  ))
     u_LineBuf_k_1(
         .reset    	(aresetn     ),
         .clk      	(aclk       ),
         .in_valid 	(k_axis_tvalid  ),
-        .data_in  	(k_axis_tdata   ),
+        .data_in  	(k_with_manual_flag   ),
         .data_out 	(k_line_buffer1  )
     );
     
     LineBuf_dpc #(
-        .WIDTH   	(K_WIDTH   ),
+        .WIDTH   	(K_WIDTH+1   ),  // 增加1位用于标志位
         .LATENCY 	(FRAME_WIDTH  ))
     u_LineBuf_dpc(
         .reset    	(aresetn     ),
@@ -238,103 +252,63 @@ module DPC_Detector #(
     end
 
     // ================================================================
-    // 坏点检测逻辑 (流水线第3级开始)
+    // 盲点检测逻辑 (流水线第3级开始)
     // ================================================================
-    
-    // 流水线第3级：死点检测
-    reg t3_data_valid;
-    reg [CNT_WIDTH-1:0] t3_x_cnt, t3_y_cnt;
-    reg [K_WIDTH-1:0] t3_k_center;
-    reg [K_WIDTH-1:0] t3_k11, t3_k12, t3_k13;
-    reg [K_WIDTH-1:0] t3_k21, t3_k23;
-    reg [K_WIDTH-1:0] t3_k31, t3_k32, t3_k33;
-    reg t3_manual_skip;
-    reg t3_dead_pixel;
-    
-    always @(posedge aclk or negedge aresetn) begin
-        if (!aresetn) begin
-            t3_data_valid <= 0;
-            t3_x_cnt <= 0;
-            t3_y_cnt <= 0;
-            t3_k_center <= 0;
-            t3_k11 <= 0; t3_k12 <= 0; t3_k13 <= 0;
-            t3_k21 <= 0; t3_k23 <= 0;
-            t3_k31 <= 0; t3_k32 <= 0; t3_k33 <= 0;
-            t3_manual_skip <= 0;
-            t3_dead_pixel <= 0;
-        end
-        else begin
-            t3_data_valid <= data_valid;
-            t3_x_cnt <= x_cnt - 1;  // 考虑窗口延迟
-            t3_y_cnt <= y_cnt;
-            t3_k_center <= k22;
-            t3_k11 <= k11; t3_k12 <= k12; t3_k13 <= k13;
-            t3_k21 <= k21; t3_k23 <= k23;
-            t3_k31 <= k31; t3_k32 <= k32; t3_k33 <= k33;
-            
-            // 检查是否需要跳过(手动坏点)
-            t3_manual_skip <= manual_bp_match;
-            
-            // 死点检测：k=0
-            t3_dead_pixel <= (k22 == 0) && !manual_bp_match && enable;
-        end
-    end
 
-    // 流水线第4级：盲点检测 - 计算邻域k值中值
-    reg t4_data_valid;
-    reg [CNT_WIDTH-1:0] t4_x_cnt, t4_y_cnt;
-    reg [K_WIDTH-1:0] t4_k_center;
-    reg t4_manual_skip;
-    reg t4_dead_pixel;
-    reg t4_stuck_pixel;
-    reg [K_WIDTH-1:0] t4_k_median;
-    
-    // k值排序网络 (简化版本，只用于3x3窗口8个邻域值)
-    wire [K_WIDTH-1:0] k_neighbors [7:0];
-    assign k_neighbors[0] = (t3_k11 == 0 || (t3_manual_skip && (t3_x_cnt-1 == manual_bp_x) && (t3_y_cnt-1 == manual_bp_y))) ? {K_WIDTH{1'b1}} : t3_k11;
-    assign k_neighbors[1] = (t3_k12 == 0 || (t3_manual_skip && (t3_x_cnt == manual_bp_x) && (t3_y_cnt-1 == manual_bp_y))) ? {K_WIDTH{1'b1}} : t3_k12;
-    assign k_neighbors[2] = (t3_k13 == 0 || (t3_manual_skip && (t3_x_cnt+1 == manual_bp_x) && (t3_y_cnt-1 == manual_bp_y))) ? {K_WIDTH{1'b1}} : t3_k13;
-    assign k_neighbors[3] = (t3_k21 == 0 || (t3_manual_skip && (t3_x_cnt-1 == manual_bp_x) && (t3_y_cnt == manual_bp_y))) ? {K_WIDTH{1'b1}} : t3_k21;
-    assign k_neighbors[4] = (t3_k23 == 0 || (t3_manual_skip && (t3_x_cnt+1 == manual_bp_x) && (t3_y_cnt == manual_bp_y))) ? {K_WIDTH{1'b1}} : t3_k23;
-    assign k_neighbors[5] = (t3_k31 == 0 || (t3_manual_skip && (t3_x_cnt-1 == manual_bp_x) && (t3_y_cnt+1 == manual_bp_y))) ? {K_WIDTH{1'b1}} : t3_k31;
-    assign k_neighbors[6] = (t3_k32 == 0 || (t3_manual_skip && (t3_x_cnt == manual_bp_x) && (t3_y_cnt+1 == manual_bp_y))) ? {K_WIDTH{1'b1}} : t3_k32;
-    assign k_neighbors[7] = (t3_k33 == 0 || (t3_manual_skip && (t3_x_cnt+1 == manual_bp_x) && (t3_y_cnt+1 == manual_bp_y))) ? {K_WIDTH{1'b1}} : t3_k33;
-    
-    // 简化的中值计算 (使用平均值替代真正的中值以节省资源)
-    wire [K_WIDTH+2:0] k_sum = k_neighbors[0] + k_neighbors[1] + k_neighbors[2] + k_neighbors[3] + 
-                               k_neighbors[4] + k_neighbors[5] + k_neighbors[6] + k_neighbors[7];
-    wire [K_WIDTH-1:0] k_avg = k_sum >> 3;  // 除以8
-    
-    always @(posedge aclk or negedge aresetn) begin
+    // 流水线第3级：计算邻域k值中值
+    // k值排序网络
+    wire [K_WIDTH:0] k_neighbors [0:7];
+    assign k_neighbors[0] = k11;
+    assign k_neighbors[1] = k12;
+    assign k_neighbors[2] = k13;
+    assign k_neighbors[3] = k21;
+    assign k_neighbors[4] = k23;
+    assign k_neighbors[5] = k31;
+    assign k_neighbors[6] = k32;
+    assign k_neighbors[7] = k33;
+
+
+    reg [K_WIDTH-1:0] k_neighbors_vld [0:7];
+    integer k_vld_cnt;
+
+    always @(posedge aclk) begin
         if (!aresetn) begin
-            t4_data_valid <= 0;
-            t4_x_cnt <= 0;
-            t4_y_cnt <= 0;
-            t4_k_center <= 0;
-            t4_manual_skip <= 0;
-            t4_dead_pixel <= 0;
-            t4_stuck_pixel <= 0;
-            t4_k_median <= 0;
+            k_vld_cnt = 0;
+            for (integer idx = 0; idx < 8; idx = idx + 1) begin
+                k_neighbors_vld[idx] <= 0;
+            end
         end
         else begin
-            t4_data_valid <= t3_data_valid;
-            t4_x_cnt <= t3_x_cnt;
-            t4_y_cnt <= t3_y_cnt;
-            t4_k_center <= t3_k_center;
-            t4_manual_skip <= t3_manual_skip;
-            t4_dead_pixel <= t3_dead_pixel;
-            t4_k_median <= k_avg;
-            
-            // 盲点检测：k值与邻域中值差异大于阈值
-            if (t3_k_center != 0 && !t3_manual_skip && !t3_dead_pixel && enable) begin
-                t4_stuck_pixel <= (t3_k_center > k_avg) ? 
-                                  (t3_k_center - k_avg > k_threshold) : 
-                                  (k_avg - t3_k_center > k_threshold);
-            end else begin
-                t4_stuck_pixel <= 0;
+            k_vld_cnt = 0;
+            for (integer i = 0; i<8; i = i + 1) begin
+                // 有效k值赋值，LATENCY_K_VLD = 1
+                if (!k_neighbors[i][K_WIDTH]) begin
+                    k_neighbors_vld[k_vld_cnt] <= k_neighbors[i][K_WIDTH-1:0];
+                    k_vld_cnt = k_vld_cnt + 1;
+                end
             end
         end
     end
+
+    // 快速中值计算模块实例化
+    wire median_valid;
+    wire [K_WIDTH-1:0] k_median;
+    wire [K_WIDTH-1:0] k_center;
+    // LATENCY_MEDIAN = 3
+    Fast_Median_Calculator #(
+        .DATA_WIDTH(K_WIDTH),
+        .MAX_COUNT(8)
+    ) u_median_calc (
+        .clk(aclk),
+        .rst_n(aresetn),
+        .valid_in(data_valid),
+        .data_array(k_neighbors_vld),
+        .valid_count(k_vld_cnt),
+        .valid_out(median_valid),
+        .median_out(k_median),
+        .center_out(k_center)
+    );
+
 
     // ================================================================
     // 坏点输出逻辑
@@ -342,56 +316,54 @@ module DPC_Detector #(
     
     // 检测到的坏点计数器
     reg [AUTO_BP_BIT:0] bp_count;
-    reg frame_done_r;
+    wire frame_done_r;
     
-    always @(posedge aclk or negedge aresetn) begin
+    reg [3:0] delay_total_cnt = 0;
+    wire delayed;
+
+    assign delayed = (delay_total_cnt >= LATENCY_TOTAL);
+    assign auto_bp_valid = k22[K_WIDTH] | (k_center > k_median + K_THRESHOLD) | (k_center < k_median - K_THRESHOLD);
+    assign frame_done_r = (auto_bp_x == frame_width - 1) && (auto_bp_y == frame_height - 1);
+    always @(posedge aclk) begin
         if (!aresetn) begin
-            auto_bp_valid <= 0;
             auto_bp_x <= 0;
             auto_bp_y <= 0;
-            auto_bp_type <= 0;
             bp_count <= 0;
-            frame_done_r <= 0;
         end
         else begin
-            frame_done_r <= frame_end_pulse;
-            
-            if (frame_start_pulse) begin
-                bp_count <= 0;
-            end
-            
-            // 输出检测到的坏点
-            if (t4_data_valid && (t4_dead_pixel || t4_stuck_pixel) && auto_bp_ready) begin
-                auto_bp_valid <= 1;
-                auto_bp_x <= t4_x_cnt;
-                auto_bp_y <= t4_y_cnt;
-                auto_bp_type <= t4_stuck_pixel;  // 0=死点, 1=盲点
-                bp_count <= bp_count + 1;
-            end
-            else if (auto_bp_ready) begin
-                auto_bp_valid <= 0;
+            delay_total_cnt <= delay_total_cnt + 1;
+            if (delayed) begin
+                if (auto_bp_y == frame_height - 1)begin
+                    auto_bp_x <= 0;
+                    auto_bp_y <= auto_bp_y + 1;
+                end
+                else begin
+                    auto_bp_x <= auto_bp_x + 1;
+                end
+                if (auto_bp_valid) begin
+                    bp_count <= bp_count + 1;
+                end
             end
         end
     end
+
 
     // ================================================================
     // 透传输出
     // ================================================================
     
     // 数据透传，不做修改
+    // 这里肯定不对，需要做latency的
     assign s_axis_tready = m_axis_tready;
     assign m_axis_tvalid = s_axis_tvalid;
     assign m_axis_tdata = s_axis_tdata;
     assign m_axis_tuser = s_axis_tuser;
     assign m_axis_tlast = s_axis_tlast;
     
+    assign k_out_tvalid = median_valid;
+    assign k_out_tdata = {auto_bp_valid, k_center};
     // 状态输出
     assign frame_detection_done = frame_done_r;
     assign detected_bp_count = bp_count;
-    
-    // 调试输出
-    assign debug_manual_skip = t4_manual_skip;
-    assign debug_dead_pixel = t4_dead_pixel;
-    assign debug_stuck_pixel = t4_stuck_pixel;
 
 endmodule

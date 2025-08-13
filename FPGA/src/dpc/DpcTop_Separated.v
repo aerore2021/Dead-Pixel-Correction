@@ -314,17 +314,10 @@ module DpcTop_Separated #(
                  .auto_bp_valid              (auto_bp_valid),
                  .auto_bp_x                  (auto_bp_x),
                  .auto_bp_y                  (auto_bp_y),
-                 .auto_bp_type               (auto_bp_type),
-                 .auto_bp_ready              (auto_bp_ready),
 
                  // 检测状态
                  .frame_detection_done       (frame_detection_done),
-                 .detected_bp_count          (detected_bp_count),
-
-                 // 调试输出
-                 .debug_manual_skip          (debug_detector_manual_skip),
-                 .debug_dead_pixel           (debug_detector_dead_pixel),
-                 .debug_stuck_pixel          (debug_detector_stuck_pixel)
+                 .detected_bp_count          (detected_bp_count)
                );
 
   // ================================================================
