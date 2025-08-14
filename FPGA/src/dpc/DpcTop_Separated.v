@@ -11,6 +11,7 @@ module DpcTop_Separated #(
     parameter FRAME_HEIGHT     = 512,
     parameter FRAME_WIDTH      = 640,
     parameter PIXEL_WIDTH = 14,
+    parameter K_WIDTH = 16,
     parameter AXI_DATA_WIDTH   = 32,
     parameter AXI_ADDR_WIDTH   = 32,
     parameter K_THRESHOLD_DEFAULT = 100,
@@ -36,7 +37,7 @@ module DpcTop_Separated #(
 
     // k值输入流接口
     input  wire                            k_axis_tvalid,
-    input  wire [  PIXEL_WIDTH-1 : 0] k_axis_tdata,
+    input  wire [  K_WIDTH : 0]        k_axis_tdata,
 
     // 坏点检测输出接口 (连接到上位机)
     output wire                            auto_bp_valid,
@@ -125,10 +126,31 @@ module DpcTop_Separated #(
   // 中间数据流信号
   wire                          det_to_corr_tvalid;
   wire                          det_to_corr_tready;
-  wire [PIXEL_WIDTH-1:0]   det_to_corr_tdata;
+  wire [PIXEL_WIDTH-1:0]        det_to_corr_tdata;
   wire                          det_to_corr_tuser;
   wire                          det_to_corr_tlast;
+  wire [PIXEL_WIDTH-1:0]        det_to_corr_w11;
+  wire [PIXEL_WIDTH-1:0]        det_to_corr_w12;
+  wire [PIXEL_WIDTH-1:0]        det_to_corr_w13;
+  wire [PIXEL_WIDTH-1:0]        det_to_corr_w21;
+  wire [PIXEL_WIDTH-1:0]        det_to_corr_w23;
+  wire [PIXEL_WIDTH-1:0]        det_to_corr_w31;
+  wire [PIXEL_WIDTH-1:0]        det_to_corr_w32;
+  wire [PIXEL_WIDTH-1:0]        det_to_corr_w33;
   
+  
+  // k值流信号（带坏点标志）
+  wire                          det_to_corr_k_tvalid;
+  wire [15:0]                   det_to_corr_k_tdata;
+  wire                          det_to_corr_k11_vld;
+  wire                          det_to_corr_k12_vld;
+  wire                          det_to_corr_k21_vld;
+  wire                          det_to_corr_k22_vld;
+  wire                          det_to_corr_k23_vld;
+  wire                          det_to_corr_k31_vld;
+  wire                          det_to_corr_k32_vld;
+  wire                          det_to_corr_k33_vld;
+
   // 坏点列表读取信号
   wire [6:0]                    auto_bp_read_addr;
   wire [31:0]                   auto_bp_read_data;
@@ -310,6 +332,26 @@ module DpcTop_Separated #(
                  .m_axis_tdata               (det_to_corr_tdata),
                  .m_axis_tuser               (det_to_corr_tuser),
                  .m_axis_tlast               (det_to_corr_tlast),
+                 .w11                         (det_to_corr_w11),
+                 .w12                         (det_to_corr_w12),
+                 .w13                         (det_to_corr_w13),
+                 .w21                         (det_to_corr_w21),
+                 .w23                         (det_to_corr_w23),
+                 .w31                         (det_to_corr_w31),
+                 .w32                         (det_to_corr_w32),
+                 .w33                         (det_to_corr_w33),
+                 
+                 // k值输出流（带坏点标志）
+                 .k_axis_tvalid              (det_to_corr_k_tvalid),
+                 .k_axis_tdata               (det_to_corr_k_tdata),
+                 .k11_vld                    (det_to_corr_k11_vld),
+                 .k12_vld                    (det_to_corr_k12_vld),
+                 .k13_vld                    (det_to_corr_k13_vld),
+                 .k21_vld                    (det_to_corr_k21_vld),
+                 .k23_vld                    (det_to_corr_k23_vld),
+                 .k31_vld                    (det_to_corr_k31_vld),
+                 .k32_vld                    (det_to_corr_k32_vld),
+                 .k33_vld                    (det_to_corr_k33_vld),
 
                  // 配置接口
                  .enable                     (detector_go_r[1]),
@@ -342,9 +384,10 @@ module DpcTop_Separated #(
 
   DPC_Corrector #(
                   .WIDTH(PIXEL_WIDTH),
+                  .K_WIDTH(16),
                   .CNT_WIDTH(10),
-                  .ALL_BP_NUM(MAX_ALL_BP),
-                  .ALL_BP_BIT(7),
+                  .FRAME_HEIGHT(FRAME_HEIGHT),
+                  .FRAME_WIDTH(FRAME_WIDTH),
                   .LATENCY(5)
                 ) corrector_inst (
                   .aclk                       (axis_aclk),
@@ -356,6 +399,10 @@ module DpcTop_Separated #(
                   .s_axis_tdata               (det_to_corr_tdata),
                   .s_axis_tuser               (det_to_corr_tuser),
                   .s_axis_tlast               (det_to_corr_tlast),
+                  
+                  // k值输入流（带坏点标志）
+                  .k_axis_tvalid              (det_to_corr_k_tvalid),
+                  .k_axis_tdata               (det_to_corr_k_tdata),
 
                   // 输出像素流
                   .m_axis_tready              (m_axis_tready),
@@ -366,14 +413,6 @@ module DpcTop_Separated #(
 
                   // 配置接口
                   .enable                     (corrector_go_r[1]),
-
-                  // 坏点列表接口
-                  .S_AXI_ACLK                 (s01_axi_aclk),
-                  .all_bp_num                 (all_bp_num_r[1]),
-                  .all_bp_wen                 (all_wen_lut),
-                  .all_bp_waddr               (all_waddr_lut[8:0]),
-                  .all_bp_wdata               (all_wdata_lut),
-                  .bp_table_ready             (bp_table_ready_r[1]),
 
                   // 调试输出
                   .debug_bp_corrected         (debug_corrector_bp_corrected),

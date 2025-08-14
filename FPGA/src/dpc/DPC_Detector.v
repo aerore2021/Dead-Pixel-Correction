@@ -37,16 +37,32 @@ module DPC_Detector #(
     input  wire                     k_axis_tvalid,
     input  wire [K_WIDTH-1:0]       k_axis_tdata,
     
-    // 输出像素流 (透传，不做修改)
+    // 输出像素流 (中间的位置)
     input  wire                     m_axis_tready,
     output wire                     m_axis_tvalid,
     output wire [WIDTH-1:0]         m_axis_tdata,
     output wire                     m_axis_tuser,
     output wire                     m_axis_tlast,
-    
+    output wire [WIDTH-1:0]         w11,
+    output wire [WIDTH-1:0]         w12,
+    output wire [WIDTH-1:0]         w13,
+    output wire [WIDTH-1:0]         w21,
+    output wire [WIDTH-1:0]         w23,
+    output wire [WIDTH-1:0]         w31,
+    output wire [WIDTH-1:0]         w32,
+    output wire [WIDTH-1:0]         w33,
+
     // 输出k值流 (带坏点标志位)
     output wire                     k_out_tvalid,
-    output wire [K_WIDTH-1:0]       k_out_tdata,    // 最高位为坏点标志，低位为k值
+    output wire [K_WIDTH:0]         k_out_tdata,    // 最高位为坏点标志，低位为k值
+    output wire                     k11_vld,
+    output wire                     k12_vld,
+    output wire                     k13_vld,
+    output wire                     k21_vld,
+    output wire                     k23_vld,
+    output wire                     k31_vld,
+    output wire                     k32_vld,
+    output wire                     k33_vld,
     
     // 配置接口
     input  wire                     enable,          // 模块使能
@@ -72,11 +88,13 @@ module DPC_Detector #(
     output wire                     frame_detection_done,  // 帧检测完成
     output wire [AUTO_BP_BIT-1:0]   detected_bp_count     // 当前帧检测到的坏点数量
 );
+    
     localparam LATENCY_CENTER = FRAME_WIDTH + 1; // 从右下角到中心
     localparam LATENCY_PADDING = 2; // padding带来的延时
     localparam LATENCY_MEDIAN = 3; // 中值延时
     localparam LATENCY_K_VLD = 1; // 得到有效k数组的延时
-    localparam LATENCY_TOTAL = LATENCY_CENTER + LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
+    localparam LATENCY_TOTAL_TO_CENTER = LATENCY_CENTER + LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
+    localparam LATENCY_TOTAL = LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
 
     // 内部信号定义
     wire data_valid = s_axis_tvalid & s_axis_tready & k_axis_tvalid;
@@ -374,7 +392,7 @@ module DPC_Detector #(
     reg [3:0] delay_total_cnt = 0;
     wire delayed;
 
-    assign delayed = (delay_total_cnt >= LATENCY_TOTAL);
+    assign delayed = (delay_total_cnt >= LATENCY_TOTAL_TO_CENTER);
     assign auto_bp_valid = k22[K_WIDTH] | (k_center > k_median + THRESHOLD) | (k_center < k_median - THRESHOLD);
     assign frame_done_r = (auto_bp_x == frame_width - 1) && (auto_bp_y == frame_height - 1);
     
@@ -431,19 +449,96 @@ module DPC_Detector #(
 
 
     // ================================================================
-    // 透传输出
+    // 延迟对齐的输出
     // ================================================================
     
-    // 数据透传，不做修改
-    // 这里肯定不对，需要做latency的
+    // 像素数据输出（延迟对齐）
+    // 像素延迟缓存，与k值处理对齐
+    reg [WIDTH-1:0] m_axis_tdata_reg;
+    reg [WIDTH-1:0] m_axis_tdata_reg_row_1;
+    reg [WIDTH-1:0] m_axis_tdata_reg_row_2;
+
+    LineBuf_dpc #(
+        .WIDTH   	(WIDTH   ),
+        .LATENCY 	(LATENCY_TOTAL-LATENCY_PADDING  ))
+    s_axit_tdata_delay(
+        .reset    	(aresetn     ),
+        .clk      	(aclk       ),
+        .in_valid 	(s_axis_tvalid  ),
+        .data_in  	(s_axis_tdata   ),
+        .data_out 	(m_axis_tdata_reg )
+    );
+
+    LineBuf_dpc #(
+        .WIDTH   	(WIDTH   ),
+        .LATENCY 	(FRAME_WIDTH  ))
+    s_axit_tdata_linebuf_row_1(
+        .reset    	(aresetn     ),
+        .clk      	(aclk       ),
+        .in_valid 	(m_axis_tvalid  ),
+        .data_in  	(m_axis_tdata_reg   ),
+        .data_out 	( m_axis_tdata_reg_row_2)
+    );
+
+    LineBuf_dpc #(
+        .WIDTH   	(WIDTH   ),
+        .LATENCY 	(FRAME_WIDTH  ))
+    s_axit_tdata_linebuf_row_2(
+        .reset    	(aresetn     ),
+        .clk      	(aclk       ),
+        .in_valid 	(m_axis_tvalid  ),
+        .data_in  	(m_axis_tdata_reg_row_2   ),
+        .data_out 	( m_axis_tdata_reg_row_1)
+    );
+
+    reg [WIDTH-1:0] m_axis_tdata_reg_r [0:2];
+    reg [WIDTH-1:0] m_axis_tdata_reg_row_1_r [0:2];
+    reg [WIDTH-1:0] m_axis_tdata_reg_row_2_r [0:2];
+
+    always @(posedge aclk) begin
+        m_axis_tdata_reg_r[2] <= m_axis_tdata_reg_r[1];
+        m_axis_tdata_reg_r[1] <= m_axis_tdata_reg_r[0];
+        m_axis_tdata_reg_r[0] <= m_axis_tdata_reg;
+
+        m_axis_tdata_reg_row_1_r[2] <= m_axis_tdata_reg_row_1_r[1];
+        m_axis_tdata_reg_row_1_r[1] <= m_axis_tdata_reg_row_1_r[0];
+        m_axis_tdata_reg_row_1_r[0] <= m_axis_tdata_reg_row_1;
+
+        m_axis_tdata_reg_row_2_r[2] <= m_axis_tdata_reg_row_2_r[1];
+        m_axis_tdata_reg_row_2_r[1] <= m_axis_tdata_reg_row_2_r[0];
+        m_axis_tdata_reg_row_2_r[0] <= m_axis_tdata_reg_row_2;
+    end
+
+    wire [WIDTH-1:0] m_axis_tdata_reg_center;
+
+    assign m_axis_tdata_reg_center = m_axis_tdata_reg_row_2_r[1];
     assign s_axis_tready = m_axis_tready;
-    assign m_axis_tvalid = s_axis_tvalid;
-    assign m_axis_tdata = s_axis_tdata;
-    assign m_axis_tuser = s_axis_tuser;
-    assign m_axis_tlast = s_axis_tlast;
+    assign m_axis_tvalid = delayed;
+    assign m_axis_tdata = m_axis_tdata_reg_center;
+    assign m_axis_tuser = (auto_bp_x == 0 && auto_bp_y == 0);
+    assign m_axis_tlast = (auto_bp_x == frame_width - 1);
+    assign w11 = m_axis_tdata_reg_row_1_r[2];
+    assign w12 = m_axis_tdata_reg_row_1_r[1];
+    assign w13 = m_axis_tdata_reg_row_1_r[0];
+    assign w21 = m_axis_tdata_reg_row_2_r[2];
+    assign w23 = m_axis_tdata_reg_row_2_r[0];
+    assign w31 = m_axis_tdata_reg[2];
+    assign w32 = m_axis_tdata_reg[1];
+    assign w33 = m_axis_tdata_reg[0];
     
+    
+    // k值输出（带坏点标志位）
     assign k_out_tvalid = median_valid;
     assign k_out_tdata = {auto_bp_valid, k_center};
+    assign k11_vld = (!k11[K_WIDTH]);
+    assign k12_vld = (!k12[K_WIDTH]);
+    assign k13_vld = (!k13[K_WIDTH]);
+    assign k21_vld = (!k21[K_WIDTH]);
+    assign k23_vld = (!k23[K_WIDTH]);
+    assign k31_vld = (!k31[K_WIDTH]);
+    assign k32_vld = (!k32[K_WIDTH]);
+    assign k33_vld = (!k33[K_WIDTH]);
+
     // 状态输出
     assign frame_detection_done = frame_done_r;
     assign detected_bp_count = bp_count;
