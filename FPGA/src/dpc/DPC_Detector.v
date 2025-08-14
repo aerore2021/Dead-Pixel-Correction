@@ -64,6 +64,10 @@ module DPC_Detector #(
     output reg [CNT_WIDTH-1:0]      auto_bp_x,        // 坏点X坐标
     output reg [CNT_WIDTH-1:0]      auto_bp_y,        // 坏点Y坐标
     
+    // AXI读取坏点列表接口
+    input  wire [AUTO_BP_BIT-1:0]   auto_bp_read_addr,  // 软核读取地址
+    output wire [31:0]              auto_bp_read_data,  // 坏点数据 {Y[15:0], X[15:0]}
+    
     // 检测状态
     output wire                     frame_detection_done,  // 帧检测完成
     output wire [AUTO_BP_BIT-1:0]   detected_bp_count     // 当前帧检测到的坏点数量
@@ -318,12 +322,54 @@ module DPC_Detector #(
 
 
     // ================================================================
-    // 坏点输出逻辑
+    // 坏点输出逻辑和列表存储
     // ================================================================
     
     // 检测到的坏点计数器
     reg [AUTO_BP_BIT:0] bp_count;
+    reg [AUTO_BP_BIT:0] bp_write_addr;
     wire frame_done_r;
+    
+    // BRAM接口信号
+    wire                        bp_bram_clka, bp_bram_clkb;
+    wire                        bp_bram_ena, bp_bram_enb;
+    wire                        bp_bram_wea;
+    wire [AUTO_BP_BIT-1:0]      bp_bram_addra, bp_bram_addrb;
+    wire [31:0]                 bp_bram_dina, bp_bram_douta, bp_bram_doutb;
+    
+    // BRAM时钟分配
+    assign bp_bram_clka = aclk;
+    assign bp_bram_clkb = aclk;
+    
+    // 写端口控制 (Port A)
+    assign bp_bram_ena = 1'b1;
+    assign bp_bram_addra = bp_write_addr;
+    assign bp_bram_dina = {6'b0, auto_bp_y, 6'b0, auto_bp_x};
+    
+    // 读端口控制 (Port B)  
+    assign bp_bram_enb = 1'b1;
+    assign bp_bram_addrb = auto_bp_read_addr;
+    
+    // 坏点列表BRAM实例化
+    BadPixel_List_BRAM #(
+        .DATA_WIDTH(32),
+        .ADDR_WIDTH(AUTO_BP_BIT),
+        .DEPTH(AUTO_BP_NUM)
+    ) bp_list_bram (
+        .clka(bp_bram_clka),
+        .ena(bp_bram_ena),
+        .wea(bp_bram_wea),
+        .addra(bp_bram_addra),
+        .dina(bp_bram_dina),
+        .douta(bp_bram_douta),
+        
+        .clkb(bp_bram_clkb),
+        .enb(bp_bram_enb),
+        .web(1'b0),  // 读端口不写入
+        .addrb(bp_bram_addrb),
+        .dinb(32'b0),
+        .doutb(bp_bram_doutb)
+    );
     
     reg [3:0] delay_total_cnt = 0;
     wire delayed;
@@ -331,28 +377,57 @@ module DPC_Detector #(
     assign delayed = (delay_total_cnt >= LATENCY_TOTAL);
     assign auto_bp_valid = k22[K_WIDTH] | (k_center > k_median + THRESHOLD) | (k_center < k_median - THRESHOLD);
     assign frame_done_r = (auto_bp_x == frame_width - 1) && (auto_bp_y == frame_height - 1);
+    
     always @(posedge aclk) begin
         if (!aresetn) begin
             auto_bp_x <= 0;
             auto_bp_y <= 0;
             bp_count <= 0;
+            bp_write_addr <= 0;
         end
         else begin
             delay_total_cnt <= delay_total_cnt + 1;
+            
+            // 帧开始时重置坏点计数和写地址
+            if (frame_start_pulse) begin
+                bp_count <= 0;
+                bp_write_addr <= 0;
+            end
+            
             if (delayed) begin
-                if (auto_bp_y == frame_height - 1)begin
+                if (auto_bp_y == frame_height - 1) begin
                     auto_bp_x <= 0;
                     auto_bp_y <= auto_bp_y + 1;
                 end
                 else begin
                     auto_bp_x <= auto_bp_x + 1;
                 end
-                if (auto_bp_valid) begin
-                    bp_count <= bp_count + 1;
-                end
             end
         end
     end
+
+    // BRAM写入控制逻辑
+    reg bp_write_en;
+    always @(posedge aclk) begin
+        if (!aresetn) begin
+            bp_write_en <= 1'b0;
+        end
+        else begin
+            // 检测到坏点且未超过最大数量时使能写入
+            bp_write_en <= delayed && auto_bp_valid && (bp_write_addr < AUTO_BP_NUM);
+            
+            // 更新写地址和计数
+            if (bp_write_en) begin
+                bp_write_addr <= bp_write_addr + 1;
+                bp_count <= bp_count + 1;
+            end
+        end
+    end
+    
+    assign bp_bram_wea = bp_write_en;
+
+    // AXI读取坏点列表接口 - 添加边界检查
+    assign auto_bp_read_data = (auto_bp_read_addr < bp_count) ? bp_bram_doutb : 32'h0;
 
 
     // ================================================================

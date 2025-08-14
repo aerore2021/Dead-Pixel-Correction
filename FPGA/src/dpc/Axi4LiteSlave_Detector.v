@@ -2,11 +2,13 @@
  * DPC检测器AXI4-Lite配置接口
  * 
  * 寄存器映射：
- * REG0: 使能控制 (go)
- * REG1: 手动坏点数量 (manual_bp_num)  
- * REG2: k值阈值 (k_threshold)
- * REG3: 保留
- * 地址0x10开始: 手动坏点表数据
+ * REG0 (0x00): 使能控制 (go)
+ * REG1 (0x04): 手动坏点数量 (manual_bp_num)  
+ * REG2 (0x08): k值阈值 (k_threshold)
+ * REG3 (0x0C): 状态寄存器 (frame_done, detected_bp_count)
+ * REG4 (0x10): 自动检测坏点读取控制 (auto_bp_read_addr)
+ * REG5 (0x14): 自动检测坏点数据 (auto_bp_x, auto_bp_y)
+ * 地址0x20开始: 手动坏点表数据
  */
 
 module Axi4LiteSlave_Detector #(
@@ -47,7 +49,15 @@ module Axi4LiteSlave_Detector #(
   input   wire [C_S_AXI_DATA_WIDTH-1:0] rdata_lut,
   output  reg [C_S_AXI_ADDR_WIDTH-1:0] waddr_lut,
   output  wire  [C_S_AXI_ADDR_WIDTH-1:0] raddr_lut,
-  output  reg                        wen_lut
+  output  reg                        wen_lut,
+  
+  // 自动检测坏点接口
+  input   wire                        frame_detection_done,
+  input   wire [LUT_INDEX_WIDTH:0]    detected_bp_count,
+  input   wire [9:0]                  auto_bp_x,
+  input   wire [9:0]                  auto_bp_y,
+  output  wire [LUT_INDEX_WIDTH-1:0]  auto_bp_read_addr,
+  input   wire [31:0]                 auto_bp_read_data   // 从检测器读取的坏点数据
 );
 
   // AXI4LITE内部信号
@@ -69,6 +79,8 @@ module Axi4LiteSlave_Detector #(
   reg     [C_S_AXI_DATA_WIDTH-1:0] slv_reg1;
   reg     [C_S_AXI_DATA_WIDTH-1:0] slv_reg2;
   reg     [C_S_AXI_DATA_WIDTH-1:0] slv_reg3;
+  reg     [C_S_AXI_DATA_WIDTH-1:0] slv_reg4;
+  reg     [C_S_AXI_DATA_WIDTH-1:0] slv_reg5;
   wire                             slv_reg_rden;
   wire                             slv_reg_wren;
   reg     [C_S_AXI_DATA_WIDTH-1:0] reg_data_out;
@@ -136,10 +148,15 @@ module Axi4LiteSlave_Detector #(
       slv_reg1 <= 0;
       slv_reg2 <= 0;
       slv_reg3 <= 0;
+      slv_reg4 <= 0;
+      slv_reg5 <= 0;
       wdata_lut <= 0;
       waddr_lut <= 0;
       wen_lut <= 0;
     end else begin
+      // 自动更新状态寄存器
+      slv_reg3 <= {15'b0, frame_detection_done, detected_bp_count[15:0]};
+      
       if (slv_reg_wren) begin
         if (axi_awaddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB] == 'd0) begin
           for (byte_index = 0; byte_index <= (C_S_AXI_DATA_WIDTH / 8) - 1; byte_index = byte_index + 1)
@@ -159,13 +176,14 @@ module Axi4LiteSlave_Detector #(
               slv_reg2[(byte_index*8)+:8] <= S_AXI_WDATA[(byte_index*8)+:8];
             end
         end
-        else if (axi_awaddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB] == 'd3) begin
+        else if (axi_awaddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB] == 'd4) begin
+          // REG4: 坏点读取地址控制寄存器，软件可写
           for (byte_index = 0; byte_index <= (C_S_AXI_DATA_WIDTH / 8) - 1; byte_index = byte_index + 1)
             if (S_AXI_WSTRB[byte_index] == 1) begin
-              slv_reg3[(byte_index*8)+:8] <= S_AXI_WDATA[(byte_index*8)+:8];
+              slv_reg4[(byte_index*8)+:8] <= S_AXI_WDATA[(byte_index*8)+:8];
             end
         end
-        else begin
+        else if (axi_awaddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB] >= 'd8) begin
           wdata_lut  <= S_AXI_WDATA;
           waddr_lut  <= axi_awaddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB];
           wen_lut <= 1'b1;          
@@ -231,8 +249,10 @@ module Axi4LiteSlave_Detector #(
       'd0: reg_data_out <= slv_reg0;
       'd1: reg_data_out <= slv_reg1;
       'd2: reg_data_out <= slv_reg2;
-      'd3: reg_data_out <= slv_reg3;
-      default: reg_data_out <= rdata_lut;
+      'd3: reg_data_out <= slv_reg3;  // 状态寄存器 (frame_done + detected_bp_count)
+      'd4: reg_data_out <= slv_reg4;  // 坏点读取地址
+      'd5: reg_data_out <= slv_reg5;  // 坏点坐标数据
+      default: reg_data_out <= rdata_lut;  // 手动坏点表
     endcase
   end
 
@@ -247,10 +267,18 @@ module Axi4LiteSlave_Detector #(
     end
   end
 
+  // 坏点坐标读取逻辑
+  // 当软件读取REG5时，根据REG4中的地址读取对应的坏点坐标
+  always @(*) begin
+    // REG5直接返回从检测器读取的坏点数据
+    slv_reg5 <= auto_bp_read_data;
+  end
+
   // 用户逻辑输出
   assign go = slv_reg0[0];
   assign manual_bp_num = slv_reg1[LUT_INDEX_WIDTH-1:0];
   assign k_threshold = slv_reg2[AXIS_TDATA_WIDTH-1:0];
-  assign raddr_lut = axi_araddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB];
+  assign raddr_lut = axi_araddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB] - 'd8; // 手动坏点表从地址8开始
+  assign auto_bp_read_addr = slv_reg4[LUT_INDEX_WIDTH-1:0];
 
 endmodule

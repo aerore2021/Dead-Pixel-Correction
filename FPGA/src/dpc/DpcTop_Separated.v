@@ -128,6 +128,10 @@ module DpcTop_Separated #(
   wire [PIXEL_WIDTH-1:0]   det_to_corr_tdata;
   wire                          det_to_corr_tuser;
   wire                          det_to_corr_tlast;
+  
+  // 坏点列表读取信号
+  wire [6:0]                    auto_bp_read_addr;
+  wire [31:0]                   auto_bp_read_data;
 
   // ================================================================
   // 检测器AXI4-Lite配置接口
@@ -167,7 +171,15 @@ module DpcTop_Separated #(
                            .wen_lut           (manual_wen_lut),
                            .waddr_lut         (manual_waddr_lut),
                            .rdata_lut         (manual_rdata_lut),
-                           .raddr_lut         (manual_raddr_lut)
+                           .raddr_lut         (manual_raddr_lut),
+                           
+                           // 坏点检测状态和列表接口
+                           .frame_detection_done(frame_detection_done),
+                           .detected_bp_count   (detected_bp_count),
+                           .auto_bp_x           (auto_bp_x),
+                           .auto_bp_y           (auto_bp_y),
+                           .auto_bp_read_addr   (auto_bp_read_addr),
+                           .auto_bp_read_data   (auto_bp_read_data)
                          );
 
   // ================================================================
@@ -314,6 +326,10 @@ module DpcTop_Separated #(
                  .auto_bp_valid              (auto_bp_valid),
                  .auto_bp_x                  (auto_bp_x),
                  .auto_bp_y                  (auto_bp_y),
+
+                 // AXI坏点列表读取接口
+                 .auto_bp_read_addr          (auto_bp_read_addr),
+                 .auto_bp_read_data          (auto_bp_read_data),
 
                  // 检测状态
                  .frame_detection_done       (frame_detection_done),
