@@ -16,7 +16,14 @@ module Fast_Median_Calculator #(
     input  wire                        clk,
     input  wire                        rst_n,
     input  wire                        valid_in,
-    input  wire [DATA_WIDTH-1:0]       data_array [0:MAX_COUNT-1],  // 输入数据数组
+    input  wire [DATA_WIDTH-1:0]       data0,
+    input  wire [DATA_WIDTH-1:0]       data1,
+    input  wire [DATA_WIDTH-1:0]       data2,
+    input  wire [DATA_WIDTH-1:0]       data3,
+    input  wire [DATA_WIDTH-1:0]       data4,
+    input  wire [DATA_WIDTH-1:0]       data5,
+    input  wire [DATA_WIDTH-1:0]       data6,
+    input  wire [DATA_WIDTH-1:0]       data7,
     input  wire [3:0]                  valid_count,                 // 有效数据个数
     
     output reg                         valid_out,
@@ -24,6 +31,15 @@ module Fast_Median_Calculator #(
     output reg  [DATA_WIDTH-1:0]       center_out //还没加
 );
 
+    wire [DATA_WIDTH-1:0] data_array [0:MAX_COUNT-1];
+    assign data_array[0] = data0;
+    assign data_array[1] = data1;
+    assign data_array[2] = data2;
+    assign data_array[3] = data3;
+    assign data_array[4] = data4;
+    assign data_array[5] = data5;
+    assign data_array[6] = data6;
+    assign data_array[7] = data7;
     // 内部寄存器
     reg [DATA_WIDTH-1:0] group1 [0:2];  // 第一组（最多3个）
     reg [DATA_WIDTH-1:0] group2 [0:2];  // 第二组（最多3个）
@@ -317,6 +333,9 @@ module Fast_Median_Calculator #(
     end
     
     // 阶段3：在三个组的代表值中找最终中值
+    // 在 always 块顶部声明候选变量
+    reg [DATA_WIDTH-1:0] candidate1, candidate2, candidate3;
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             valid_out <= 0;
@@ -332,8 +351,6 @@ module Fast_Median_Calculator #(
                     2: median_out <= (group1_mid + group2_mid) >> 1;
                     default: begin
                         // 在三个代表值中找中值：max的min, min的max, mid的mid
-                        reg [DATA_WIDTH-1:0] candidate1, candidate2, candidate3;
-                        
                         // 获取候选值
                         candidate1 = (group1_max < group2_max) ? ((group1_max < group3_max) ? group1_max : group3_max) : ((group2_max < group3_max) ? group2_max : group3_max);  // max的min
                         candidate2 = (group1_min > group2_min) ? ((group1_min > group3_min) ? group1_min : group3_min) : ((group2_min > group3_min) ? group2_min : group3_min);  // min的max

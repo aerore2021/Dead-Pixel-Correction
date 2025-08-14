@@ -302,7 +302,14 @@ module DPC_Detector #(
         .clk(aclk),
         .rst_n(aresetn),
         .valid_in(data_valid),
-        .data_array(k_neighbors_vld),
+        .data0(k_neighbors_vld[0]),
+        .data1(k_neighbors_vld[1]),
+        .data2(k_neighbors_vld[2]),
+        .data3(k_neighbors_vld[3]),
+        .data4(k_neighbors_vld[4]),
+        .data5(k_neighbors_vld[5]),
+        .data6(k_neighbors_vld[6]),
+        .data7(k_neighbors_vld[7]),
         .valid_count(k_vld_cnt),
         .valid_out(median_valid),
         .median_out(k_median),
@@ -322,7 +329,7 @@ module DPC_Detector #(
     wire delayed;
 
     assign delayed = (delay_total_cnt >= LATENCY_TOTAL);
-    assign auto_bp_valid = k22[K_WIDTH] | (k_center > k_median + K_THRESHOLD) | (k_center < k_median - K_THRESHOLD);
+    assign auto_bp_valid = k22[K_WIDTH] | (k_center > k_median + THRESHOLD) | (k_center < k_median - THRESHOLD);
     assign frame_done_r = (auto_bp_x == frame_width - 1) && (auto_bp_y == frame_height - 1);
     always @(posedge aclk) begin
         if (!aresetn) begin
