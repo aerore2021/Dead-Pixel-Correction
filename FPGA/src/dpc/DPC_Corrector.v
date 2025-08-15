@@ -102,7 +102,7 @@ module DPC_Corrector #(
                          (k23_vld ? w23 : 0) + (k31_vld ? w31 : 0) + 
                          (k32_vld ? w32 : 0) + (k33_vld ? w33 : 0);
     
-    always @(posedge aclk or negedge aresetn) begin
+    always @(posedge aclk) begin
         if (!aresetn) begin
             t1_data_valid <= 0;
             t1_center_bad <= 0;
