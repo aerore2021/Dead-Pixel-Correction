@@ -31,7 +31,7 @@ module DpcTop_Separated #(
     // Ports of Axi Slave Bus Interface S_AXIS
     output wire                            s_axis_tready,
     input  wire                            s_axis_tvalid,
-    input  wire [  PIXEL_WIDTH-1 : 0] s_axis_tdata,
+    input  wire [  PIXEL_WIDTH-1 : 0]      s_axis_tdata,
     input  wire                            s_axis_tuser,
     input  wire                            s_axis_tlast,
 
@@ -129,6 +129,8 @@ module DpcTop_Separated #(
   wire [PIXEL_WIDTH-1:0]        det_to_corr_tdata;
   wire                          det_to_corr_tuser;
   wire                          det_to_corr_tlast;
+  
+  // 3x3窗口像素信号
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w11;
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w12;
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w13;
@@ -138,14 +140,13 @@ module DpcTop_Separated #(
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w32;
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w33;
   
-  
   // k值流信号（带坏点标志）
-  wire                          det_to_corr_k_tvalid;
-  wire [15:0]                   det_to_corr_k_tdata;
+  wire                          det_to_corr_k_out_tvalid;
+  wire [K_WIDTH:0]              det_to_corr_k_out_tdata;
   wire                          det_to_corr_k11_vld;
   wire                          det_to_corr_k12_vld;
+  wire                          det_to_corr_k13_vld;
   wire                          det_to_corr_k21_vld;
-  wire                          det_to_corr_k22_vld;
   wire                          det_to_corr_k23_vld;
   wire                          det_to_corr_k31_vld;
   wire                          det_to_corr_k32_vld;
@@ -332,18 +333,18 @@ module DpcTop_Separated #(
                  .m_axis_tdata               (det_to_corr_tdata),
                  .m_axis_tuser               (det_to_corr_tuser),
                  .m_axis_tlast               (det_to_corr_tlast),
-                 .w11                         (det_to_corr_w11),
-                 .w12                         (det_to_corr_w12),
-                 .w13                         (det_to_corr_w13),
-                 .w21                         (det_to_corr_w21),
-                 .w23                         (det_to_corr_w23),
-                 .w31                         (det_to_corr_w31),
-                 .w32                         (det_to_corr_w32),
-                 .w33                         (det_to_corr_w33),
+                 .w11                        (det_to_corr_w11),
+                 .w12                        (det_to_corr_w12),
+                 .w13                        (det_to_corr_w13),
+                 .w21                        (det_to_corr_w21),
+                 .w23                        (det_to_corr_w23),
+                 .w31                        (det_to_corr_w31),
+                 .w32                        (det_to_corr_w32),
+                 .w33                        (det_to_corr_w33),
                  
                  // k值输出流（带坏点标志）
-                 .k_axis_tvalid              (det_to_corr_k_tvalid),
-                 .k_axis_tdata               (det_to_corr_k_tdata),
+                 .k_out_tvalid               (det_to_corr_k_out_tvalid),
+                 .k_out_tdata                (det_to_corr_k_out_tdata),
                  .k11_vld                    (det_to_corr_k11_vld),
                  .k12_vld                    (det_to_corr_k12_vld),
                  .k13_vld                    (det_to_corr_k13_vld),
@@ -388,7 +389,7 @@ module DpcTop_Separated #(
                   .CNT_WIDTH(10),
                   .FRAME_HEIGHT(FRAME_HEIGHT),
                   .FRAME_WIDTH(FRAME_WIDTH),
-                  .LATENCY(5)
+                  .LATENCY(2)
                 ) corrector_inst (
                   .aclk                       (axis_aclk),
                   .aresetn                    (axis_aresetn),
@@ -400,9 +401,27 @@ module DpcTop_Separated #(
                   .s_axis_tuser               (det_to_corr_tuser),
                   .s_axis_tlast               (det_to_corr_tlast),
                   
+                  // 3x3窗口像素输入
+                  .w11                        (det_to_corr_w11),
+                  .w12                        (det_to_corr_w12),
+                  .w13                        (det_to_corr_w13),
+                  .w21                        (det_to_corr_w21),
+                  .w23                        (det_to_corr_w23),
+                  .w31                        (det_to_corr_w31),
+                  .w32                        (det_to_corr_w32),
+                  .w33                        (det_to_corr_w33),
+                  
                   // k值输入流（带坏点标志）
-                  .k_axis_tvalid              (det_to_corr_k_tvalid),
-                  .k_axis_tdata               (det_to_corr_k_tdata),
+                  .k_out_tvalid               (det_to_corr_k_out_tvalid),
+                  .k_out_tdata                (det_to_corr_k_out_tdata),
+                  .k11_vld                    (det_to_corr_k11_vld),
+                  .k12_vld                    (det_to_corr_k12_vld),
+                  .k13_vld                    (det_to_corr_k13_vld),
+                  .k21_vld                    (det_to_corr_k21_vld),
+                  .k23_vld                    (det_to_corr_k23_vld),
+                  .k31_vld                    (det_to_corr_k31_vld),
+                  .k32_vld                    (det_to_corr_k32_vld),
+                  .k33_vld                    (det_to_corr_k33_vld),
 
                   // 输出像素流
                   .m_axis_tready              (m_axis_tready),
