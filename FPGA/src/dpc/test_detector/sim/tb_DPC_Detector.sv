@@ -16,9 +16,10 @@ module tb_DPC_Detector();
     parameter WIDTH = 16;
     parameter K_WIDTH = 16;
     parameter CNT_WIDTH = 10;
-    parameter FRAME_HEIGHT = 10;
-    parameter FRAME_WIDTH = 10;
-    parameter THRESHOLD = 200;
+    parameter FRAME_HEIGHT = 20;  // 修改为20x20图像
+    parameter FRAME_WIDTH = 20;
+    parameter THRESHOLD_AUTO = 300;   // 自动检测阈值（较大，不敏感）
+    parameter THRESHOLD_MANUAL = 150; // 手动检测阈值（较小，更敏感）
     parameter CLK_PERIOD = 10; // 10ns时钟周期
     parameter AXI_CLK_PERIOD = 5; // 5ns AXI时钟周期 (2倍主时钟频率)
     
@@ -83,12 +84,12 @@ module tb_DPC_Detector();
     // 测试数据存储
     reg [WIDTH-1:0] test_image [0:FRAME_HEIGHT-1][0:FRAME_WIDTH-1];
     reg [K_WIDTH-1:0] test_k_values [0:FRAME_HEIGHT-1][0:FRAME_WIDTH-1];
-    reg [3:0] bad_pixel_x [0:2]; // 3个自动坏点的x坐标
-    reg [3:0] bad_pixel_y [0:2]; // 3个自动坏点的y坐标
+    reg [4:0] bad_pixel_x [0:2]; // 3个自动坏点的x坐标 (5位支持0-19)
+    reg [4:0] bad_pixel_y [0:2]; // 3个自动坏点的y坐标
     
-    // 手动坏点信息存储
-    reg [3:0] manual_pixel_x [0:3]; // 4个手动坏点的x坐标
-    reg [3:0] manual_pixel_y [0:3]; // 4个手动坏点的y坐标
+    // 手动坏点信息存储 (现在是区域中心坐标)
+    reg [4:0] manual_pixel_x [0:2]; // 3个手动区域的x中心坐标 (5位支持0-19)
+    reg [4:0] manual_pixel_y [0:2]; // 3个手动区域的y中心坐标
     integer manual_pixel_count;
     
     // 控制信号
@@ -112,7 +113,8 @@ module tb_DPC_Detector();
         .MANUAL_BP_BIT(7),
         .AUTO_BP_NUM(256),
         .AUTO_BP_BIT(8),
-        .THRESHOLD(THRESHOLD),
+        .THRESHOLD_AUTO(THRESHOLD_AUTO),
+        .THRESHOLD_MANUAL(THRESHOLD_MANUAL),
         .FRAME_HEIGHT(FRAME_HEIGHT),
         .FRAME_WIDTH(FRAME_WIDTH)
     ) dut (
@@ -183,54 +185,47 @@ module tb_DPC_Detector();
         integer manual_bp_count;
         
         $display("=== Setting up Manual Bad Pixels ===");
+        $display("新逻辑：手动标记坐标的5x5范围内使用更小阈值定位坏点");
+        $display("自动阈值=%0d, 手动阈值=%0d", THRESHOLD_AUTO, THRESHOLD_MANUAL);
         
-        // 手动坏点按行列扫描顺序排列:
-        // 1. (x=5,y=2) → 32'h00020005
-        // 2. (x=5,y=3) → 32'h00030005  
-        // 3. (x=5,y=4) → 32'h00040005
-        // 4. (x=1,y=5) → 32'h00050001
-        
-        // 手动坏点1: (x=5,y=2)
+        // 手动区域1: 中心坐标(8,8)，5x5范围[6:10][6:10]
+        // 在此区域内有微弱坏点，自动检测不到，但手动检测可以
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b1;
         manual_waddr = 7'h00;
-        manual_wdata = {16'd2, 16'd5}; // y=2, x=5
+        manual_wdata = {16'd8, 16'd8}; // y=8, x=8 (中心坐标)
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b0;
-        $display("Manual Bad Pixel 1: (x=%0d,y=%0d), data=32'h%08h", 5, 2, {16'd2, 16'd5});
+        $display("Manual Region 1: center(x=%0d,y=%0d), 5x5 area[6:10][6:10]", 8, 8);
         
-        // 手动坏点2: (x=5,y=3)
+        // 手动区域2: 中心坐标(15,5)，5x5范围[13:17][3:7]  
+        // 在此区域内有微弱坏点群
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b1;
         manual_waddr = 7'h01;
-        manual_wdata = {16'd3, 16'd5}; // y=3, x=5
+        manual_wdata = {16'd5, 16'd15}; // y=5, x=15
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b0;
-        $display("Manual Bad Pixel 2: (x=%0d,y=%0d), data=32'h%08h", 5, 3, {16'd3, 16'd5});
+        $display("Manual Region 2: center(x=%0d,y=%0d), 5x5 area[13:17][3:7]", 15, 5);
         
-        // 手动坏点3: (x=5,y=4)
+        // 手动区域3: 中心坐标(3,12)，5x5范围[1:5][10:14]
+        // 边界附近的微弱坏点
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b1;
         manual_waddr = 7'h02;
-        manual_wdata = {16'd3, 16'd6}; // y=3, x=6
+        manual_wdata = {16'd12, 16'd3}; // y=12, x=3
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b0;
-        $display("Manual Bad Pixel 3: (x=%0d,y=%0d), data=32'h%08h", 6, 3, {16'd3, 16'd6});
-        
-        // 手动坏点4: (x=1,y=5)
-        @(posedge S_AXI_ACLK);
-        manual_wen = 1'b1;
-        manual_waddr = 7'h03;
-        manual_wdata = {16'd5, 16'd1}; // y=5, x=1
-        @(posedge S_AXI_ACLK);
-        manual_wen = 1'b0;
-        $display("Manual Bad Pixel 4: (x=%0d,y=%0d), data=32'h%08h", 1, 5, {16'd5, 16'd1});
+        $display("Manual Region 3: center(x=%0d,y=%0d), 5x5 area[1:5][10:14]", 3, 12);
         
         // 设置手动坏点总数
-        manual_bp_count = 4;
+        manual_bp_count = 3;
         manual_bp_num = manual_bp_count;
         
-        $display("Manual bad pixels setup completed. Total: %0d", manual_bp_count);
+        $display("Manual regions setup completed. Total: %0d", manual_bp_count);
+        $display("");
+    end
+    endtask
         $display("");
     end
     endtask
@@ -241,45 +236,71 @@ module tb_DPC_Detector();
         integer i, j;
         reg [15:0] base_value;
         
-        $display("=== Generating Test Data ===");
+        $display("=== Generating 20x20 Test Image Data ===");
         
         // 生成正常图像数据（渐变图像）
         for (i = 0; i < FRAME_HEIGHT; i = i + 1) begin
             for (j = 0; j < FRAME_WIDTH; j = j + 1) begin
-                base_value = 1000 + i * 100 + j * 10; // 渐变值
+                base_value = 2000 + i * 50 + j * 10; // 基础渐变值
                 test_image[i][j] = base_value;
-                test_k_values[i][j] = base_value + $random % 20 - 10; // 正常k值，少量随机噪声
+                test_k_values[i][j] = base_value + $random % 40 - 20; // 正常k值，少量随机噪声
             end
         end
         
-        // 设置手动坏点坐标记录（与setup_manual_bad_pixels()中的坐标保持一致）
-        // 注意：x=列坐标，y=行坐标，按照行优先扫描顺序排列
-        manual_pixel_count = 4;
-        manual_pixel_x[0] = 5; manual_pixel_y[0] = 2; // 手动坏点1 (x=5,y=2)
-        manual_pixel_x[1] = 5; manual_pixel_y[1] = 3; // 手动坏点2 (x=5,y=3)
-        manual_pixel_x[2] = 6; manual_pixel_y[2] = 3; // 手动坏点3 (x=6,y=3)
-        manual_pixel_x[3] = 1; manual_pixel_y[3] = 5; // 手动坏点4 (x=1,y=5)
+        // 在手动区域1 [6:10][6:10] 中心(8,8)设置微弱坏点
+        // 这些坏点自动检测不到(差值<300)，但手动检测可以(差值>150)
+        test_image[7][9] = 2350;  // 在区域内偏离中心
+        test_k_values[7][9] = 2150; // k值差异=200，介于150和300之间
+        $display("微弱坏点1: (x=%0d,y=%0d), data=%0d, k=%0d, diff=%0d", 
+                 9, 7, test_image[7][9], test_k_values[7][9], 
+                 test_image[7][9] > test_k_values[7][9] ? 
+                 test_image[7][9] - test_k_values[7][9] : test_k_values[7][9] - test_image[7][9]);
         
-        // 随机生成3个自动检测坏点位置（避免边界和手动坏点位置）
+        test_image[9][7] = 2280;  // 另一个微弱坏点
+        test_k_values[9][7] = 2480; // k值差异=200
+        $display("微弱坏点2: (x=%0d,y=%0d), data=%0d, k=%0d, diff=%0d", 
+                 7, 9, test_image[9][7], test_k_values[9][7], 
+                 test_image[9][7] > test_k_values[9][7] ? 
+                 test_image[9][7] - test_k_values[9][7] : test_k_values[9][7] - test_image[9][7]);
+        
+        // 在手动区域2 [13:17][3:7] 中心(15,5)设置微弱坏点群
+        test_image[4][14] = 2200;  // 坏点群1
+        test_k_values[4][14] = 2020;
+        test_image[6][16] = 2400;  // 坏点群2  
+        test_k_values[6][16] = 2600;
+        $display("微弱坏点群: 区域2内设置2个微弱坏点");
+        
+        // 在手动区域3 [1:5][10:14] 中心(3,12)设置边界微弱坏点
+        test_image[11][2] = 2600;  
+        test_k_values[11][2] = 2400;
+        $display("边界微弱坏点: (x=%0d,y=%0d)", 2, 11);
+        
+        // 设置手动区域坐标记录（现在是区域中心坐标）
+        manual_pixel_count = 3;
+        manual_pixel_x[0] = 8; manual_pixel_y[0] = 8;   // 区域1中心
+        manual_pixel_x[1] = 15; manual_pixel_y[1] = 5;  // 区域2中心  
+        manual_pixel_x[2] = 3; manual_pixel_y[2] = 12;  // 区域3中心
+        
+        // 设置自动检测坏点（明显坏点，差值>300）
         // 注意：x=列坐标，y=行坐标
-        bad_pixel_x[0] = 2; bad_pixel_y[0] = 3; // 第一个自动坏点 (x=2,y=3)
-        bad_pixel_x[1] = 6; bad_pixel_y[1] = 4; // 第二个自动坏点 (x=6,y=4)
-        bad_pixel_x[2] = 8; bad_pixel_y[2] = 7; // 第三个自动坏点 (x=8,y=7)
+        bad_pixel_x[0] = 3; bad_pixel_y[0] = 4; // 第一个自动坏点 (x=3,y=4)
+        bad_pixel_x[1] = 12; bad_pixel_y[1] = 8; // 第二个自动坏点 (x=12,y=8)
+        bad_pixel_x[2] = 18; bad_pixel_y[2] = 15; // 第三个自动坏点 (x=18,y=15)
         
-        // 设置自动检测坏点数据
+        // 设置自动检测坏点数据（明显坏点）
         for (i = 0; i < 3; i = i + 1) begin
             case (i)
                 0: begin // 死点 (k=0)
                     test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 0;
                     test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = 0;
-                    $display("Auto Bad Point %0d: Dead point, (%0d,%0d), data=0, k=0", 
+                    $display("Auto Bad Point %0d: Dead point, (x=%0d,y=%0d), data=0, k=0", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i]);
                 end
                 1: begin // 盲点 (k值异常大)
                     test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 2000;
                     test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = 
-                        test_image[bad_pixel_y[i]][bad_pixel_x[i]] + THRESHOLD + 30;
-                    $display("Auto Bad Point %0d: Stuck point, (%0d,%0d), data=%0d, k=%0d", 
+                        test_image[bad_pixel_y[i]][bad_pixel_x[i]] + THRESHOLD_AUTO + 50;
+                    $display("Auto Bad Point %0d: Stuck point, (x=%0d,y=%0d), data=%0d, k=%0d", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i],
                              test_image[bad_pixel_y[i]][bad_pixel_x[i]],
                              test_k_values[bad_pixel_y[i]][bad_pixel_x[i]]);
@@ -287,8 +308,8 @@ module tb_DPC_Detector();
                 2: begin // 盲点 (k值异常小)
                     test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 500;
                     test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = 
-                        test_image[bad_pixel_y[i]][bad_pixel_x[i]] - THRESHOLD - 30;
-                    $display("Auto Bad Point %0d: Stuck point, (%0d,%0d), data=%0d, k=%0d", 
+                        test_image[bad_pixel_y[i]][bad_pixel_x[i]] - THRESHOLD_AUTO - 50;
+                    $display("Auto Bad Point %0d: Stuck point, (x=%0d,y=%0d), data=%0d, k=%0d", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i],
                              test_image[bad_pixel_y[i]][bad_pixel_x[i]],
                              test_k_values[bad_pixel_y[i]][bad_pixel_x[i]]);
@@ -296,8 +317,10 @@ module tb_DPC_Detector();
             endcase
         end
         
-        $display("Test data generated (3 auto bad pixels for detection testing).");
-        $display("Manual bad pixels will be configured separately before frame input.");
+        $display("Test data generated:");
+        $display("- 3 auto bad pixels for automatic detection (threshold=%0d)", THRESHOLD_AUTO);
+        $display("- Multiple weak bad pixels in manual regions (threshold=%0d)", THRESHOLD_MANUAL);
+        $display("- Manual regions will be processed with smaller threshold");
     end
     endtask
     
@@ -433,7 +456,7 @@ module tb_DPC_Detector();
         integer detected_auto_count;
     begin
         total_expected_auto = 3;
-        total_expected_manual = 4;
+        total_expected_manual = 3;
         total_expected = total_expected_auto + total_expected_manual;
         correct_auto_detections = 0;
         correct_manual_detections = 0;
@@ -494,9 +517,9 @@ module tb_DPC_Detector();
         end
         $display("");
         
-        // 检查每个预设手动坏点是否被检测到
-        $display("Manual Bad Pixel Detection Verification:");
-        for (i = 0; i < 4; i = i + 1) begin
+        // 检查每个预设手动区域是否被检测到
+        $display("Manual Region Detection Verification:");
+        for (i = 0; i < 3; i = i + 1) begin
             found = 0;
             for (j = 0; j < detected_count; j = j + 1) begin
                 if (detected_bp_list_x[j] == manual_pixel_x[i] && 
@@ -533,9 +556,9 @@ module tb_DPC_Detector();
                         break;
                     end
                 end
-                // 检查是否在手动坏点列表中
+                // 检查是否在手动区域中
                 if (!found) begin
-                    for (j = 0; j < 4; j = j + 1) begin
+                    for (j = 0; j < 3; j = j + 1) begin
                         if (detected_bp_list_x[i] == manual_pixel_x[j] && 
                             detected_bp_list_y[i] == manual_pixel_y[j]) begin
                             found = 1;
@@ -601,11 +624,10 @@ module tb_DPC_Detector();
         $display("========================================");
         $display("DPC_Detector Testbench Starts");
         $display("Frame Size: %0dx%0d", FRAME_WIDTH, FRAME_HEIGHT);
-        $display("Detecting Threshold: %0d", THRESHOLD);
-        $display("Main Clock Period: %0d ns", CLK_PERIOD);
-        $display("AXI Clock Period: %0d ns (2x frequency)", AXI_CLK_PERIOD);
-        $display("Manual Bad Pixels: 4 (1 individual + 3 column-adjacent)");
-        $display("Auto Bad Pixels: 3 (for detection testing)");
+        $display("Auto Detection Threshold: %0d", THRESHOLD_AUTO);
+        $display("Manual Detection Threshold: %0d", THRESHOLD_MANUAL);
+        $display("Manual Regions: 3 (5x5 areas with weak bad pixels)");
+        $display("Auto Bad Pixels: 3 (obvious defects for detection testing)");
         $display("========================================");
         
         // 初始化信号
@@ -618,7 +640,7 @@ module tb_DPC_Detector();
         s_axis_tlast = 1'b0;
         m_axis_tready = 1'b1;
         enable = 1'b1;
-        k_threshold = THRESHOLD;
+        k_threshold = THRESHOLD_AUTO;
 
         // 手动坏点表初始化
         manual_bp_num = 7'b0;
@@ -659,7 +681,7 @@ module tb_DPC_Detector();
         
         $display("========================================");
         $display("Testbench Verification Completed");
-        $display("Total Expected Bad Pixels: %0d (4 manual + 3 auto)", 7);
+        $display("Total Expected Bad Pixels: %0d (3 manual regions + 3 auto)", 6);
         $display("========================================");
         
         #(CLK_PERIOD * 50);
