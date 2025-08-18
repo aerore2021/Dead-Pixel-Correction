@@ -39,7 +39,7 @@ module Manual_BadPixel_Checker #(
         if (frame_start && !re_frame_start) begin
             next_raddr = 0;
         end
-        else if (bad_pixel_match && raddr < bad_point_num) begin
+        else if ((current_x == bad_x + 5) && (current_y == bad_y + 5) && raddr < bad_point_num) begin
             next_raddr = raddr + 1;
         end
         else begin
@@ -60,7 +60,11 @@ module Manual_BadPixel_Checker #(
     end
     
     // 坏点匹配判断
-    assign bad_pixel_match = (current_x == bad_x) && (current_y == bad_y) && (raddr < bad_point_num);
+    wire x_is_in, y_is_in;
+    assign x_is_in = (current_x <= bad_x + 5) && (current_x + 5 >= bad_x);
+    assign y_is_in = (current_y <= bad_y + 5) && (current_y + 5 >= bad_y);
+    assign bad_pixel_match = x_is_in && y_is_in && (raddr < bad_point_num);
+
     // BRAM读使能信号：always enable to support continuous reading
     assign re = 1'b1;
     assign next_bad_x = bad_x;

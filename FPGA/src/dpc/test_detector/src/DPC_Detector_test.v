@@ -139,40 +139,6 @@ module DPC_Detector_test #(
   end
 
   // ================================================================
-  // 手动坏点检测模块
-  // ================================================================
-
-  wire manual_bp_match;
-  wire [CNT_WIDTH-1:0] manual_bp_x, manual_bp_y;
-
-  Manual_BadPixel_Checker #(
-                            .WIDTH_BITS(CNT_WIDTH),
-                            .HEIGHT_BITS(CNT_WIDTH),
-                            .BAD_POINT_NUM(MANUAL_BP_NUM),
-                            .BAD_POINT_BIT(MANUAL_BP_BIT)
-                          ) manual_checker (
-                            .clk(aclk),
-                            .rst_n(aresetn),
-                            .S_AXI_ACLK(S_AXI_ACLK),
-
-                            // 当前处理位置
-                            .current_x(x_cnt),
-                            .current_y(y_cnt),
-                            .frame_start(frame_start_pulse),
-
-                            // 手动坏点表配置
-                            .bad_point_num(manual_bp_num),
-                            .wen_lut(manual_wen),
-                            .waddr_lut(manual_waddr),
-                            .wdata_lut(manual_wdata),
-
-                            // 输出
-                            .bad_pixel_match(manual_bp_match),
-                            .next_bad_x(manual_bp_x),
-                            .next_bad_y(manual_bp_y)
-                          );
-
-  // ================================================================
   // k值窗口缓存 (3x3):LATENCY=FRAME_WIDTH*2+2
   // 扩展k值位宽，加入手动坏点标志位
   // ================================================================
@@ -498,12 +464,12 @@ module DPC_Detector_test #(
   wire delayed;
   wire padding_valid;
   wire linebuf_m_valid;
+  wire k_thres_mux;
 
   assign delayed = (delay_total_cnt > LATENCY_TOTAL_TO_CENTER);
   assign median_valid = (delay_total_cnt > LATENCY_TO_MEDIAN);
   assign padding_valid = (delay_total_cnt > LATENCY_CENTER + LATENCY_PADDING);
   assign linebuf_m_valid = (delay_total_cnt > LATENCY_TOTAL-1); // 减一是因为后面有一个延时
-  assign auto_bp_valid = (k_center_with_flag[K_WIDTH]) | (k_center > k_median + THRESHOLD_AUTO) | (k_center < k_median - THRESHOLD_AUTO);
   assign frame_done_r = (auto_bp_x == frame_width - 1) && (auto_bp_y == frame_height - 1);
 
   always @(posedge aclk)
@@ -548,6 +514,44 @@ module DPC_Detector_test #(
       end
     end
   end
+
+
+  // ================================================================
+  // 手动坏点匹配检测
+  // ================================================================
+
+  wire manual_bp_match;
+  wire [CNT_WIDTH-1:0] manual_bp_x, manual_bp_y;
+  assign k_thres_mux = (manual_bp_match) ? THRESHOLD_MANUAL : THRESHOLD_AUTO;
+  assign auto_bp_valid = (k_center_with_flag[K_WIDTH]) | (k_center > k_median + k_thres_mux) | (k_center < k_median - k_thres_mux);
+
+  
+  Manual_BadPixel_Checker #(
+                            .WIDTH_BITS(CNT_WIDTH),
+                            .HEIGHT_BITS(CNT_WIDTH),
+                            .BAD_POINT_NUM(MANUAL_BP_NUM),
+                            .BAD_POINT_BIT(MANUAL_BP_BIT)
+                          ) manual_checker (
+                            .clk(aclk),
+                            .rst_n(aresetn),
+                            .S_AXI_ACLK(S_AXI_ACLK),
+
+                            // 当前处理位置
+                            .current_x(auto_bp_x),
+                            .current_y(auto_bp_y),
+                            .frame_start(m_axis_tuser),
+
+                            // 手动坏点表配置
+                            .bad_point_num(manual_bp_num),
+                            .wen_lut(manual_wen),
+                            .waddr_lut(manual_waddr),
+                            .wdata_lut(manual_wdata),
+
+                            // 输出
+                            .bad_pixel_match(manual_bp_match),
+                            .next_bad_x(manual_bp_x),
+                            .next_bad_y(manual_bp_y)
+                          );
 
   // BRAM写入控制逻辑
   reg bp_write_en;
