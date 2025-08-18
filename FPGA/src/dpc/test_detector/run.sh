@@ -35,6 +35,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -sim|--simulation)
             DO_SIMULATION=true
+            DO_SYNTHESIS=false
             shift
             ;;
         -a|--all)

@@ -49,17 +49,19 @@ puts "INFO: Project '$project_name' created successfully"
 add_files -norecurse {
     src/DPC_Detector_test.v
     src/LineBuf_dpc.v
+    src/Fast_Median_Calculator.v
 }
 
 # Add simulation files
 add_files -fileset sim_1 -norecurse {
-    sim/tb_DPC_Detector.v
+    sim/tb_DPC_Detector.sv
 }
 
 # Set file properties
 set_property file_type SystemVerilog [get_files src/DPC_Detector_test.v]
 set_property file_type SystemVerilog [get_files src/LineBuf_dpc.v]
-set_property file_type SystemVerilog [get_files sim/tb_DPC_Detector.v]
+set_property file_type SystemVerilog [get_files src/Fast_Median_Calculator.v]
+set_property file_type SystemVerilog [get_files sim/tb_DPC_Detector.sv]
 
 # Set top modules
 set_property top DPC_Detector [get_filesets sources_1]
@@ -67,14 +69,14 @@ set_property top tb_DPC_Detector [get_filesets sim_1]
 puts "INFO: Source files added successfully"
 
 # Generate DPC_Detector dedicated BRAM IP
-create_ip -name blk_mem_gen -vendor xilinx.com -library ip -version 8.4 -module_name BRAM_32x8192
+create_ip -name blk_mem_gen -vendor xilinx.com -library ip -version 8.4 -module_name BRAM_32x1024
 
 # Configure BRAM parameters - Optimized for DPC_Detector
 set_property -dict [list \
     CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
-    CONFIG.Write_Width_A {10} \
+    CONFIG.Write_Width_A {32} \
     CONFIG.Write_Depth_A {1024} \
-    CONFIG.Read_Width_B {10} \
+    CONFIG.Read_Width_B {32} \
     CONFIG.Enable_A {Always_Enabled} \
     CONFIG.Enable_B {Use_ENB_Pin} \
     CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \

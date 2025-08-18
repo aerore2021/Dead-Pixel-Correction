@@ -313,6 +313,9 @@ module DPC_Detector #(
     end
 
     // 快速中值计算模块实例化
+    wire [3:0] k_vld_cnt_in;
+    assign k_vld_cnt_in = k_vld_cnt;
+
     wire median_valid;
     wire [K_WIDTH-1:0] k_median;
     wire [K_WIDTH-1:0] k_center;
@@ -332,7 +335,7 @@ module DPC_Detector #(
         .data5(k_neighbors_vld[5]),
         .data6(k_neighbors_vld[6]),
         .data7(k_neighbors_vld[7]),
-        .valid_count(k_vld_cnt),
+        .valid_count(k_vld_cnt_in),
         .valid_out(median_valid),
         .median_out(k_median),
         .center_out(k_center)

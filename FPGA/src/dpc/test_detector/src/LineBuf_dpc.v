@@ -23,7 +23,7 @@ module LineBuf_dpc #(
   reg [9:0] raddr = 0;
 
   always @(posedge clk) begin
-    if (reset) begin
+    if (!reset) begin
       raddr <= 'd0;
       waddr <= LATENCY - 1;
     end else if (in_valid) begin
@@ -33,14 +33,15 @@ module LineBuf_dpc #(
     end
   end
 
-  BRAM_32x1024 h_lut (
-    .clk    (clk),
-    .we     (in_valid),
-    .waddr  (waddr),
-    .wdata_a(data_in),
-    .re     (in_valid),
-    .raddr  (raddr),
-    .rdata_b(data_out)
+  BRAM_32x1024 u_BRAM_32x1024(
+    .clka  	(clk   ),
+    .wea   	(in_valid    ),
+    .addra 	(waddr  ),
+    .dina  	(data_in   ),
+    .enb    (1'b1),
+    .clkb  	(clk   ),
+    .addrb 	(raddr  ),
+    .doutb 	(data_out  )
   );
 
 endmodule

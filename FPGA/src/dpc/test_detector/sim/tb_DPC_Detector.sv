@@ -148,12 +148,12 @@ module tb_DPC_Detector();
     end
 
     // 生成测试数据
-    task generate_test_data;
+    task generate_test_data();
     begin
         integer i, j;
         reg [15:0] base_value;
         
-        $display("=== 生成测试数据 ===");
+        $display("=== Generating Test Data ===");
         
         // 生成正常图像数据（渐变图像）
         for (i = 0; i < FRAME_HEIGHT; i = i + 1) begin
@@ -175,14 +175,14 @@ module tb_DPC_Detector();
                 0: begin // 死点 (k=0)
                     test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 0;
                     test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = 0;
-                    $display("坏点%0d: 死点, 位置(%0d,%0d), 像素值=0, k值=0", 
+                    $display("Bad Point %0d: Dead point, (%0d,%0d), data=0, k=0", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i]);
                 end
                 1: begin // 盲点 (k值异常大)
                     test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 2000;
                     test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = 
                         test_image[bad_pixel_y[i]][bad_pixel_x[i]] + THRESHOLD + 30;
-                    $display("坏点%0d: 盲点(高), 位置(%0d,%0d), 像素值=%0d, k值=%0d", 
+                    $display("Bad Point %0d: Stuck point, (%0d,%0d), data=%0d, k=%0d", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i],
                              test_image[bad_pixel_y[i]][bad_pixel_x[i]],
                              test_k_values[bad_pixel_y[i]][bad_pixel_x[i]]);
@@ -191,7 +191,7 @@ module tb_DPC_Detector();
                     test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 500;
                     test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = 
                         test_image[bad_pixel_y[i]][bad_pixel_x[i]] - THRESHOLD - 30;
-                    $display("坏点%0d: 盲点(低), 位置(%0d,%0d), 像素值=%0d, k值=%0d", 
+                    $display("Bad Point %0d: Stuck point, (%0d,%0d), data=%0d, k=%0d", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i],
                              test_image[bad_pixel_y[i]][bad_pixel_x[i]],
                              test_k_values[bad_pixel_y[i]][bad_pixel_x[i]]);
@@ -199,16 +199,16 @@ module tb_DPC_Detector();
             endcase
         end
         
-        $display("测试数据生成完成");
+        $display("Test data generated. ");
     end
     endtask
     
     // 发送一帧图像数据
-    task send_frame;
+    task send_frame();
     begin
         integer i, j;
         
-        $display("=== 开始发送帧数据 ===");
+        $display("=== Start Sending Pixels ===");
         frame_count = frame_count + 1;
         pixel_count = 0;
         
@@ -233,7 +233,7 @@ module tb_DPC_Detector();
                 
                 // 显示像素信息（可选）
                 if (j == 0 || j == FRAME_WIDTH-1 || i == 0 || i == FRAME_HEIGHT-1) begin
-                    $display("发送像素[%0d,%0d]: 像素=%0d, k=%0d, SOF=%b, EOL=%b", 
+                    $display("Send Pixel [%0d,%0d]: data=%0d, k=%0d, SOF=%b, EOL=%b", 
                              i, j, s_axis_tdata, k_axis_tdata, s_axis_tuser, s_axis_tlast);
                 end
             end
@@ -245,7 +245,7 @@ module tb_DPC_Detector();
         s_axis_tuser = 1'b0;
         s_axis_tlast = 1'b0;
         
-        $display("帧数据发送完成，共发送 %0d 个像素", pixel_count);
+        $display("Frame data sent, %0d pixels", pixel_count);
     end
     endtask
     
@@ -258,7 +258,7 @@ module tb_DPC_Detector();
                 detected_bp_list[detected_count*2] = auto_bp_x;
                 detected_bp_list[detected_count*2+1] = auto_bp_y;
                 detected_count = detected_count + 1;
-                $display("检测到坏点 %0d: 位置(%0d,%0d)", detected_count, auto_bp_x, auto_bp_y);
+                $display("Detected Bad Pixel %0d: (%0d,%0d)", detected_count, auto_bp_x, auto_bp_y);
             end
         end
     end
@@ -271,16 +271,16 @@ module tb_DPC_Detector();
             if (m_axis_tvalid && m_axis_tready) begin
                 output_count = output_count + 1;
                 if (output_count <= 10 || output_count > (FRAME_HEIGHT*FRAME_WIDTH - 10)) begin
-                    $display("输出像素 %0d: 值=%0d, SOF=%b, EOL=%b, 窗口中心位置", 
+                    $display("Output Pixel %0d: data=%0d, SOF=%b, EOL=%b, in the middle of the window", 
                              output_count, m_axis_tdata, m_axis_tuser, m_axis_tlast);
-                    $display("  3x3窗口: [%4d %4d %4d]", w11, w12, w13);
+                    $display("  3x3 Window: [%4d %4d %4d]", w11, w12, w13);
                     $display("           [%4d %4s %4d]", w21, "CTR", w23);
                     $display("           [%4d %4d %4d]", w31, w32, w33);
-                    $display("  k值有效: [%b %b %b]", k11_vld, k12_vld, k13_vld);
+                    $display("  k is valid: [%b %b %b]", k11_vld, k12_vld, k13_vld);
                     $display("           [%b %s %b]", k21_vld, "X", k23_vld);
                     $display("           [%b %b %b]", k31_vld, k32_vld, k33_vld);
                     if (k_out_tvalid) begin
-                        $display("  k输出: 坏点标志=%b, k值=%0d", 
+                        $display("  k output: Bad point flag=%b, k=%0d", 
                                 k_out_tdata[K_WIDTH], k_out_tdata[K_WIDTH-1:0]);
                     end
                 end
@@ -289,15 +289,15 @@ module tb_DPC_Detector();
     end
     
     // 验证检测结果
-    task verify_detection_results;
+    task verify_detection_results();
     begin
         integer i, j;
         integer found;
         integer total_expected = 3;
-        
-        $display("=== 验证检测结果 ===");
-        $display("期望检测到坏点数量: %0d", total_expected);
-        $display("实际检测到坏点数量: %0d", detected_bp_count);
+
+        $display("=== Verification Results ===");
+        $display("Expected Number: %0d", total_expected);
+        $display("Actual Number: %0d", detected_bp_count);
         
         // 检查每个预设坏点是否被检测到
         for (i = 0; i < 3; i = i + 1) begin
@@ -311,25 +311,25 @@ module tb_DPC_Detector();
             end
             
             if (found) begin
-                $display("✓ 坏点%0d 位置(%0d,%0d) 成功检测", 
+                $display("✓ Bad Point %0d (%0d,%0d) Success", 
                          i+1, bad_pixel_x[i], bad_pixel_y[i]);
             end else begin
-                $display("✗ 坏点%0d 位置(%0d,%0d) 未被检测到", 
+                $display("✗ Bad Point %0d (%0d,%0d) Not Detected", 
                          i+1, bad_pixel_x[i], bad_pixel_y[i]);
             end
         end
         
         // 检查是否有误检
         if (detected_count > total_expected) begin
-            $display("警告: 检测到额外的坏点，可能存在误检");
+            $display("Warning: Detected extra bad points, possible false positives");
         end
         
-        $display("检测验证完成");
+        $display("Detect Process Verified");
     end
     endtask
     
     // 读取BRAM中存储的坏点列表
-    task read_bp_list_from_bram;
+    task read_bp_list_from_bram();
     begin
         integer i;
         reg [31:0] bp_data;
@@ -354,9 +354,9 @@ module tb_DPC_Detector();
     // 主测试流程
     initial begin
         $display("========================================");
-        $display("DPC_Detector Testbench 开始");
-        $display("图像尺寸: %0dx%0d", FRAME_WIDTH, FRAME_HEIGHT);
-        $display("检测阈值: %0d", THRESHOLD);
+        $display("DPC_Detector Testbench Starts");
+        $display("Frame Size: %0dx%0d", FRAME_WIDTH, FRAME_HEIGHT);
+        $display("Detecting Threshold: %0d", THRESHOLD);
         $display("========================================");
         
         // 初始化信号
@@ -389,7 +389,7 @@ module tb_DPC_Detector();
         send_frame();
         
         // 等待处理完成
-        $display("等待检测完成...");
+        $display("Waiting detection to end...");
         wait(frame_detection_done);
         #(CLK_PERIOD * 100);
         
@@ -397,10 +397,10 @@ module tb_DPC_Detector();
         verify_detection_results();
         
         // 读取BRAM数据
-        read_bp_list_from_bram();
+        // read_bp_list_from_bram();
         
         $display("========================================");
-        $display("测试完成");
+        $display("Verification Ends");
         $display("========================================");
         
         #(CLK_PERIOD * 50);
