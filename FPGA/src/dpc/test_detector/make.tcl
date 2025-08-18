@@ -50,6 +50,7 @@ add_files -norecurse {
     src/DPC_Detector_test.v
     src/LineBuf_dpc.v
     src/Fast_Median_Calculator.v
+    src/Manual_BadPixel_Checker.v
 }
 
 # Add simulation files
@@ -61,6 +62,7 @@ add_files -fileset sim_1 -norecurse {
 set_property file_type SystemVerilog [get_files src/DPC_Detector_test.v]
 set_property file_type SystemVerilog [get_files src/LineBuf_dpc.v]
 set_property file_type SystemVerilog [get_files src/Fast_Median_Calculator.v]
+set_property file_type SystemVerilog [get_files src/Manual_BadPixel_Checker.v]
 set_property file_type SystemVerilog [get_files sim/tb_DPC_Detector.sv]
 
 # Set top modules
@@ -70,6 +72,7 @@ puts "INFO: Source files added successfully"
 
 # Generate DPC_Detector dedicated BRAM IP
 create_ip -name blk_mem_gen -vendor xilinx.com -library ip -version 8.4 -module_name BRAM_32x1024
+create_ip -name blk_mem_gen -vendor xilinx.com -library ip -version 8.4 -module_name BRAM_BadPoint_Dual
 
 # Configure BRAM parameters - Optimized for DPC_Detector
 set_property -dict [list \
@@ -95,6 +98,36 @@ launch_runs BRAM_32x1024_synth_1
 wait_on_run BRAM_32x1024_synth_1
 
 if {[get_property PROGRESS [get_runs BRAM_32x1024_synth_1]] == "100%"} {
+    puts "INFO: BRAM IP generated successfully."
+} else {
+    puts "ERROR: BRAM IP generation failed. Please check the logs for details."
+    exit 1
+}
+
+# Configure BRAM_BadPoint_Dual parameters
+set_property -dict [list \
+    CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
+    CONFIG.Write_Width_A {32} \
+    CONFIG.Write_Depth_A {128} \
+    CONFIG.Read_Width_B {32} \
+    CONFIG.Enable_A {Always_Enabled} \
+    CONFIG.Enable_B {Use_ENB_Pin} \
+    CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
+    CONFIG.Use_Byte_Write_Enable {false} \
+    CONFIG.Byte_Size {9} \
+    CONFIG.Assume_Synchronous_Clk {true} \
+] [get_ips BRAM_BadPoint_Dual]
+
+puts "INFO: BRAM IP 'BRAM_BadPoint_Dual' configured successfully"
+
+# Generate IP - Wait for completion
+puts "INFO: Generating BRAM IP files..."
+generate_target all [get_ips BRAM_BadPoint_Dual]
+create_ip_run [get_ips BRAM_BadPoint_Dual]
+launch_runs BRAM_BadPoint_Dual_synth_1
+wait_on_run BRAM_BadPoint_Dual_synth_1
+
+if {[get_property PROGRESS [get_runs BRAM_BadPoint_Dual_synth_1]] == "100%"} {
     puts "INFO: BRAM IP generated successfully."
 } else {
     puts "ERROR: BRAM IP generation failed. Please check the logs for details."

@@ -27,7 +27,7 @@ module Manual_BadPixel_Checker #(
 
     // 读地址和控制
     reg [BAD_POINT_BIT-1:0] raddr;
-    reg re;
+    wire re;
     reg re_frame_start;
     wire [31:0] rdata;
     wire [WIDTH_BITS-1:0] bad_x = rdata[31:16];
@@ -38,7 +38,6 @@ module Manual_BadPixel_Checker #(
         if (!rst_n) begin
             raddr <= 0;
             re_frame_start <= 1;
-            re <= 0;
         end
         else begin
             re_frame_start <= frame_start;
@@ -46,21 +45,17 @@ module Manual_BadPixel_Checker #(
             if (frame_start && !re_frame_start) begin
                 // 帧开始，重置读地址
                 raddr <= 0;
-                re <= 1;
             end
             else if (bad_pixel_match && raddr < bad_point_num) begin
                 // 匹配到坏点，读取下一个
                 raddr <= raddr + 1;
-                re <= 1;
-            end
-            else begin
-                re <= 0;
             end
         end
     end
     
     // 坏点匹配判断
     assign bad_pixel_match = (current_x == bad_x) && (current_y == bad_y) && (raddr < bad_point_num);
+    assign re = bad_pixel_match;
     assign next_bad_x = bad_x;
     assign next_bad_y = bad_y;
     

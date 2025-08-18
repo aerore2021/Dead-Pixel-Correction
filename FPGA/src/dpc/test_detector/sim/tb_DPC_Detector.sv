@@ -18,7 +18,7 @@ module tb_DPC_Detector();
     parameter CNT_WIDTH = 10;
     parameter FRAME_HEIGHT = 10;
     parameter FRAME_WIDTH = 10;
-    parameter THRESHOLD = 50;
+    parameter THRESHOLD = 200;
     parameter CLK_PERIOD = 10; // 10ns时钟周期
     
     // 测试信号定义
@@ -254,7 +254,7 @@ module tb_DPC_Detector();
         detected_count = 0;
         forever begin
             @(posedge aclk);
-            if (s_axis_tvalid && auto_bp_valid) begin
+            if (m_axis_tvalid && auto_bp_valid) begin
                 detected_bp_list[detected_count*2] = auto_bp_x;
                 detected_bp_list[detected_count*2+1] = auto_bp_y;
                 detected_count = detected_count + 1;

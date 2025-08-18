@@ -27,8 +27,7 @@ module Fast_Median_Calculator #(
     input  wire [3:0]                  valid_count,                 // 有效数据个数
     
     output reg                         valid_out,
-    output reg  [DATA_WIDTH-1:0]       median_out,
-    output reg  [DATA_WIDTH-1:0]       center_out //还没加
+    output reg  [DATA_WIDTH-1:0]       median_out
 );
 
     wire [DATA_WIDTH-1:0] data_array [0:MAX_COUNT-1];
@@ -375,5 +374,6 @@ module Fast_Median_Calculator #(
             end
         end
     end
+
 
 endmodule

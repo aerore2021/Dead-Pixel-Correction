@@ -43,7 +43,7 @@ module DPC_Detector_test #(
     output wire [WIDTH-1:0]         m_axis_tdata,
     output wire                     m_axis_tuser,
     output wire                     m_axis_tlast,
-    output wire [WIDTH-1:0]         w11,
+    output wire [WIDTH-1:0]         w11, // 未padding
     output wire [WIDTH-1:0]         w12,
     output wire [WIDTH-1:0]         w13,
     output wire [WIDTH-1:0]         w21,
@@ -87,8 +87,8 @@ module DPC_Detector_test #(
     localparam LATENCY_MEDIAN = 3; // 中值延时
     localparam LATENCY_K_VLD = 1; // 得到有效k数组的延时
     localparam LATENCY_TO_MEDIAN = LATENCY_CENTER + LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
-    localparam LATENCY_TOTAL_TO_CENTER = LATENCY_CENTER + LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
-    localparam LATENCY_TOTAL = LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
+    localparam LATENCY_TOTAL_TO_CENTER = LATENCY_CENTER + LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD; // 第一个输入到有效输出的时间，需要加上一行一列的延时
+    localparam LATENCY_TOTAL = LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD; // 流水线的总延时，输入到输出的总延时
 
     // 内部信号定义
     wire data_valid = s_axis_tvalid & s_axis_tready & k_axis_tvalid;
@@ -412,12 +412,15 @@ module DPC_Detector_test #(
     // );
     
     reg [15:0] delay_total_cnt;
+    reg frame_end;
     wire delayed;
     wire padding_valid;
+    wire linebuf_m_valid;
 
     assign delayed = (delay_total_cnt > LATENCY_TOTAL_TO_CENTER);
     assign median_valid = (delay_total_cnt > LATENCY_TO_MEDIAN);
     assign padding_valid = (delay_total_cnt > LATENCY_CENTER + LATENCY_PADDING);
+    assign linebuf_m_valid = (delay_total_cnt > LATENCY_TOTAL-1); // 减一是因为后面有一个延时
     assign auto_bp_valid = (k_center_with_flag[K_WIDTH]) | (k_center > k_median + THRESHOLD) | (k_center < k_median - THRESHOLD);
     assign frame_done_r = (auto_bp_x == frame_width - 1) && (auto_bp_y == frame_height - 1);
     
@@ -428,6 +431,7 @@ module DPC_Detector_test #(
             bp_count <= 0;
             bp_write_addr <= 0;
             delay_total_cnt <= 'd0;
+            frame_end <= 0;
         end
         else begin
             if (s_axis_tvalid) begin
@@ -448,7 +452,9 @@ module DPC_Detector_test #(
                     auto_bp_x <= auto_bp_x + 1;
                 end
             end
-            
+            if (frame_done_r) begin
+                frame_end <= 1;
+            end
         end
     end
 
@@ -488,7 +494,7 @@ module DPC_Detector_test #(
 
     LineBuf_dpc #(
         .WIDTH   	(WIDTH   ),
-        .LATENCY 	(LATENCY_TOTAL ))
+        .LATENCY 	(LATENCY_TOTAL-1 )) // 减一是因为后面有一个延时
     s_axis_tdata_delay(
         .reset    	(aresetn     ),
         .clk      	(aclk       ),
@@ -503,9 +509,9 @@ module DPC_Detector_test #(
     s_axis_tdata_linebuf_row_1(
         .reset    	(aresetn     ),
         .clk      	(aclk       ),
-        .in_valid 	(m_axis_tvalid  ),
+        .in_valid 	(linebuf_m_valid  ),
         .data_in  	(m_axis_tdata_reg   ),
-        .data_out 	( m_axis_tdata_reg_row_2)
+        .data_out 	( m_axis_tdata_reg_row_1)
     );
 
     LineBuf_dpc #(
@@ -514,9 +520,9 @@ module DPC_Detector_test #(
     s_axis_tdata_linebuf_row_2(
         .reset    	(aresetn     ),
         .clk      	(aclk       ),
-        .in_valid 	(m_axis_tvalid  ),
-        .data_in  	(m_axis_tdata_reg_row_2   ),
-        .data_out 	( m_axis_tdata_reg_row_1)
+        .in_valid 	(linebuf_m_valid  ),
+        .data_in  	(m_axis_tdata_reg_row_1   ),
+        .data_out 	( m_axis_tdata_reg_row_2)
     );
 
     reg [WIDTH-1:0] m_axis_tdata_reg_r [0:2];
@@ -539,20 +545,20 @@ module DPC_Detector_test #(
     
     wire [WIDTH-1:0] m_axis_tdata_reg_center;
 
-    assign m_axis_tdata_reg_center = m_axis_tdata_reg_row_2_r[1];
+    assign m_axis_tdata_reg_center = m_axis_tdata_reg_row_1_r[1];
     assign s_axis_tready = m_axis_tready;
-    assign m_axis_tvalid = delayed;
+    assign m_axis_tvalid = delayed && frame_end;
     assign m_axis_tdata = m_axis_tdata_reg_center;
     assign m_axis_tuser = (auto_bp_x == 0 && auto_bp_y == 0);
     assign m_axis_tlast = (auto_bp_x == frame_width - 1);
-    assign w11 = m_axis_tdata_reg_row_1_r[2];
-    assign w12 = m_axis_tdata_reg_row_1_r[1];
-    assign w13 = m_axis_tdata_reg_row_1_r[0];
-    assign w21 = m_axis_tdata_reg_row_2_r[2];
-    assign w23 = m_axis_tdata_reg_row_2_r[0];
-    assign w31 = m_axis_tdata_reg[2];
-    assign w32 = m_axis_tdata_reg[1];
-    assign w33 = m_axis_tdata_reg[0];
+    assign w11 = m_axis_tdata_reg_row_2_r[2];
+    assign w12 = m_axis_tdata_reg_row_2_r[1];
+    assign w13 = m_axis_tdata_reg_row_2_r[0];
+    assign w21 = m_axis_tdata_reg_row_1_r[2];
+    assign w23 = m_axis_tdata_reg_row_1_r[0];
+    assign w31 = m_axis_tdata_reg_r[2];
+    assign w32 = m_axis_tdata_reg_r[1];
+    assign w33 = m_axis_tdata_reg_r[0];
     
     
     // k值输出（带坏点标志位）

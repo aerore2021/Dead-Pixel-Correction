@@ -23,7 +23,7 @@ module LineBuf_dpc #(
   reg [9:0] raddr = 0;
 
   always @(posedge clk) begin
-    if (reset) begin
+    if (!reset) begin
       raddr <= 'd0;
       waddr <= LATENCY - 1;
     end else if (in_valid) begin

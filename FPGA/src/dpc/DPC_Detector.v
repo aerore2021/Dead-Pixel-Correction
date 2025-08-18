@@ -43,7 +43,7 @@ module DPC_Detector #(
     output wire [WIDTH-1:0]         m_axis_tdata,
     output wire                     m_axis_tuser,
     output wire                     m_axis_tlast,
-    output wire [WIDTH-1:0]         w11,
+    output wire [WIDTH-1:0]         w11, // 未padding
     output wire [WIDTH-1:0]         w12,
     output wire [WIDTH-1:0]         w13,
     output wire [WIDTH-1:0]         w21,
@@ -90,25 +90,23 @@ module DPC_Detector #(
 );
     
     localparam LATENCY_CENTER = FRAME_WIDTH + 1; // 从右下角到中心
-    localparam LATENCY_PADDING = 2; // padding带来的延时
+    localparam LATENCY_PADDING = 3; // padding带来的延时
     localparam LATENCY_MEDIAN = 3; // 中值延时
     localparam LATENCY_K_VLD = 1; // 得到有效k数组的延时
-    localparam LATENCY_TOTAL_TO_CENTER = LATENCY_CENTER + LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
-    localparam LATENCY_TOTAL = LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
+    localparam LATENCY_TO_MEDIAN = LATENCY_CENTER + LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD;
+    localparam LATENCY_TOTAL_TO_CENTER = LATENCY_CENTER + LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD; // 第一个输入到有效输出的时间，需要加上一行一列的延时
+    localparam LATENCY_TOTAL = LATENCY_PADDING + LATENCY_MEDIAN + LATENCY_K_VLD; // 流水线的总延时，输入到输出的总延时
 
     // 内部信号定义
     wire data_valid = s_axis_tvalid & s_axis_tready & k_axis_tvalid;
     wire [CNT_WIDTH-1:0] frame_height = FRAME_HEIGHT;
     wire [CNT_WIDTH-1:0] frame_width = FRAME_WIDTH;
     
-    // 输入k值没有标志位，在处理过程中添加标志位
-    wire [K_WIDTH-1:0] k_value_in = k_axis_tdata;  // 输入的完整k值
-    
     // 坐标计数器
     reg [CNT_WIDTH-1:0] x_cnt, y_cnt;
     reg frame_start_pulse, frame_end_pulse;
     
-    always @(posedge aclk or negedge aresetn) begin
+    always @(posedge aclk) begin
         if (!aresetn) begin
             x_cnt <= 0;
             y_cnt <= 0;
@@ -118,7 +116,7 @@ module DPC_Detector #(
         else if (data_valid) begin
             frame_start_pulse <= s_axis_tuser & ~frame_start_pulse;
             
-            if (s_axis_tlast) begin
+            if (x_cnt == frame_width-1) begin
                 x_cnt <= 0;
                 y_cnt <= y_cnt + 1;
                 frame_end_pulse <= (y_cnt == frame_height - 1);
@@ -176,8 +174,8 @@ module DPC_Detector #(
     wire [K_WIDTH:0] k_with_manual_flag;  // 扩展1位用于标志位
     assign k_with_manual_flag = {manual_bp_match|(k_axis_tdata == 'd0), k_axis_tdata}; // 手动要和输入的坐标对齐，以及加入DP检测
     
-    reg [K_WIDTH:0] k_line_buffer1;
-    reg [K_WIDTH:0] k_line_buffer2;
+    wire [K_WIDTH:0] k_line_buffer1;
+    wire [K_WIDTH:0] k_line_buffer2;
 
     reg [K_WIDTH:0] k_line_buffer1_r [0:2];
     reg [K_WIDTH:0] k_line_buffer2_r [0:2];
@@ -230,7 +228,8 @@ module DPC_Detector #(
 
     wire is_first_row, is_last_row, is_first_col, is_last_col;
     wire is_sec_row, is_last_sec_row, is_sec_col, is_last_sec_col;
-    reg is_sec_row_r, is_last_sec_row_r;
+    reg is_sec_row_r, is_last_sec_row_r, is_sec_col_r, is_last_sec_col_r;
+    reg is_sec_row_r2, is_last_sec_row_r2;
 
     assign is_first_row = (y_cnt == 0);
     assign is_last_row = (y_cnt == FRAME_HEIGHT - 1);
@@ -245,32 +244,36 @@ module DPC_Detector #(
     // 窗口移位逻辑: LATENCY_PADDING = 2
     always @(posedge aclk) begin
         // step 1
-        k11_r <= (is_sec_col) ? k_line_buffer2_r[1] : k_line_buffer2_r[0];
-        k21_r <= (is_sec_col) ? k_line_buffer1_r[1] : k_line_buffer1_r[0];
-        k31_r <= (is_sec_col) ? k_axis_tdata_r[1] : k_axis_tdata_r[0];
+        k11_r <= (is_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[0];
+        k21_r <= (is_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[0];
+        k31_r <= (is_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[0];
 
         k12_r <= k_line_buffer2_r[1];
         k22_r <= k_line_buffer1_r[1];
         k32_r <= k_axis_tdata_r[1];
 
-        k13_r <= (is_last_sec_col) ? k_line_buffer2_r[1] : k_line_buffer2_r[2];
-        k23_r <= (is_last_sec_col) ? k_line_buffer1_r[1] : k_line_buffer1_r[2];
-        k33_r <= (is_last_sec_col) ? k_axis_tdata_r[1] : k_axis_tdata_r[2];
+        k13_r <= (is_last_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[2];
+        k23_r <= (is_last_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[2];
+        k33_r <= (is_last_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[2];
         // step 2
-        k11 <= (is_sec_row_r) ? k21_r : k11_r;
-        k12 <= (is_sec_row_r) ? k22_r : k12_r;
-        k13 <= (is_sec_row_r) ? k23_r : k13_r;
+        k11 <= (is_sec_row_r2) ? k21_r : k11_r;
+        k12 <= (is_sec_row_r2) ? k22_r : k12_r;
+        k13 <= (is_sec_row_r2) ? k23_r : k13_r;
 
         k21 <= k21_r;
         k22 <= k22_r;
         k23 <= k23_r;
 
-        k31 <= (is_last_sec_row_r) ? k21_r : k31_r;
-        k32 <= (is_last_sec_row_r) ? k22_r : k32_r;
-        k33 <= (is_last_sec_row_r) ? k23_r : k33_r;
+        k31 <= (is_last_sec_row_r2) ? k21_r : k31_r;
+        k32 <= (is_last_sec_row_r2) ? k22_r : k32_r;
+        k33 <= (is_last_sec_row_r2) ? k23_r : k33_r;
     
         is_sec_row_r <= is_sec_row;
+        is_sec_row_r2 <= is_sec_row_r;
         is_last_sec_row_r <= is_last_sec_row;
+        is_last_sec_row_r2 <= is_last_sec_row_r;
+        is_sec_col_r <= is_sec_col;
+        is_last_sec_col_r <= is_last_sec_col;
     end
 
     // ================================================================
@@ -319,6 +322,7 @@ module DPC_Detector #(
     wire median_valid;
     wire [K_WIDTH-1:0] k_median;
     wire [K_WIDTH-1:0] k_center;
+    wire [K_WIDTH:0]   k_center_with_flag;
     // LATENCY_MEDIAN = 3
     Fast_Median_Calculator #(
         .DATA_WIDTH(K_WIDTH),
@@ -336,12 +340,64 @@ module DPC_Detector #(
         .data6(k_neighbors_vld[6]),
         .data7(k_neighbors_vld[7]),
         .valid_count(k_vld_cnt_in),
-        .valid_out(median_valid),
-        .median_out(k_median),
-        .center_out(k_center)
+        .median_out(k_median)
     );
 
+    localparam LATENCY_CENTER2MEDIAN = 4;
+    reg [K_WIDTH:0] k_center_with_flag_r [0:3];
+    reg k11_flag_r [0:3];
+    reg k12_flag_r [0:3];
+    reg k13_flag_r [0:3];
+    reg k21_flag_r [0:3];
+    reg k23_flag_r [0:3];
+    reg k31_flag_r [0:3];
+    reg k32_flag_r [0:3];
+    reg k33_flag_r [0:3];
 
+    always @(posedge aclk) begin
+        k_center_with_flag_r[0] <= k22;
+        k_center_with_flag_r[1] <= k_center_with_flag_r[0];
+        k_center_with_flag_r[2] <= k_center_with_flag_r[1];
+        k_center_with_flag_r[3] <= k_center_with_flag_r[2];
+
+        k11_flag_r[0] <= k11[K_WIDTH];
+        k12_flag_r[0] <= k12[K_WIDTH];
+        k13_flag_r[0] <= k13[K_WIDTH];
+        k21_flag_r[0] <= k21[K_WIDTH];
+        k23_flag_r[0] <= k23[K_WIDTH];
+        k31_flag_r[0] <= k31[K_WIDTH];
+        k32_flag_r[0] <= k32[K_WIDTH];
+        k33_flag_r[0] <= k33[K_WIDTH];
+
+        k11_flag_r[1] <= k11_flag_r[0];
+        k12_flag_r[1] <= k12_flag_r[0];
+        k13_flag_r[1] <= k13_flag_r[0];
+        k21_flag_r[1] <= k21_flag_r[0];
+        k23_flag_r[1] <= k23_flag_r[0];
+        k31_flag_r[1] <= k31_flag_r[0];
+        k32_flag_r[1] <= k32_flag_r[0];
+        k33_flag_r[1] <= k33_flag_r[0];
+
+        k11_flag_r[2] <= k11_flag_r[1];
+        k12_flag_r[2] <= k12_flag_r[1];
+        k13_flag_r[2] <= k13_flag_r[1];
+        k21_flag_r[2] <= k21_flag_r[1];
+        k23_flag_r[2] <= k23_flag_r[1];
+        k31_flag_r[2] <= k31_flag_r[1];
+        k32_flag_r[2] <= k32_flag_r[1];
+        k33_flag_r[2] <= k33_flag_r[1];
+
+        k11_flag_r[3] <= k11_flag_r[2];
+        k12_flag_r[3] <= k12_flag_r[2];
+        k13_flag_r[3] <= k13_flag_r[2];
+        k21_flag_r[3] <= k21_flag_r[2];
+        k23_flag_r[3] <= k23_flag_r[2];
+        k31_flag_r[3] <= k31_flag_r[2];
+        k32_flag_r[3] <= k32_flag_r[2];
+        k33_flag_r[3] <= k33_flag_r[2];
+    end
+    assign k_center_with_flag = k_center_with_flag_r[3];
+    assign k_center = k_center_with_flag[K_WIDTH-1:0];
     // ================================================================
     // 坏点输出逻辑和列表存储
     // ================================================================
@@ -392,11 +448,17 @@ module DPC_Detector #(
         .doutb(bp_bram_doutb)
     );
     
-    reg [3:0] delay_total_cnt = 0;
+    reg [15:0] delay_total_cnt;
+    reg frame_end;
     wire delayed;
+    wire padding_valid;
+    wire linebuf_m_valid;
 
-    assign delayed = (delay_total_cnt >= LATENCY_TOTAL_TO_CENTER);
-    assign auto_bp_valid = k22[K_WIDTH] | (k_center > k_median + THRESHOLD) | (k_center < k_median - THRESHOLD);
+    assign delayed = (delay_total_cnt > LATENCY_TOTAL_TO_CENTER);
+    assign median_valid = (delay_total_cnt > LATENCY_TO_MEDIAN);
+    assign padding_valid = (delay_total_cnt > LATENCY_CENTER + LATENCY_PADDING);
+    assign linebuf_m_valid = (delay_total_cnt > LATENCY_TOTAL-1); // 减一是因为后面有一个延时
+    assign auto_bp_valid = (k_center_with_flag[K_WIDTH]) | (k_center > k_median + THRESHOLD) | (k_center < k_median - THRESHOLD);
     assign frame_done_r = (auto_bp_x == frame_width - 1) && (auto_bp_y == frame_height - 1);
     
     always @(posedge aclk) begin
@@ -405,10 +467,13 @@ module DPC_Detector #(
             auto_bp_y <= 0;
             bp_count <= 0;
             bp_write_addr <= 0;
+            delay_total_cnt <= 'd0;
+            frame_end <= 0;
         end
         else begin
-            delay_total_cnt <= delay_total_cnt + 1;
-            
+            if (s_axis_tvalid) begin
+                delay_total_cnt <= delay_total_cnt + 'd1;
+            end    
             // 帧开始时重置坏点计数和写地址
             if (frame_start_pulse) begin
                 bp_count <= 0;
@@ -416,13 +481,16 @@ module DPC_Detector #(
             end
             
             if (delayed) begin
-                if (auto_bp_y == frame_height - 1) begin
+                if (auto_bp_x == frame_width - 1) begin
                     auto_bp_x <= 0;
                     auto_bp_y <= auto_bp_y + 1;
                 end
                 else begin
                     auto_bp_x <= auto_bp_x + 1;
                 end
+            end
+            if (frame_done_r) begin
+                frame_end <= 1;
             end
         end
     end
@@ -457,14 +525,14 @@ module DPC_Detector #(
     
     // 像素数据输出（延迟对齐）
     // 像素延迟缓存，与k值处理对齐
-    reg [WIDTH-1:0] m_axis_tdata_reg;
-    reg [WIDTH-1:0] m_axis_tdata_reg_row_1;
-    reg [WIDTH-1:0] m_axis_tdata_reg_row_2;
+    wire [WIDTH-1:0] m_axis_tdata_reg;
+    wire [WIDTH-1:0] m_axis_tdata_reg_row_1;
+    wire [WIDTH-1:0] m_axis_tdata_reg_row_2;
 
     LineBuf_dpc #(
         .WIDTH   	(WIDTH   ),
-        .LATENCY 	(LATENCY_TOTAL-LATENCY_PADDING  ))
-    s_axit_tdata_delay(
+        .LATENCY 	(LATENCY_TOTAL-1 )) // 减一是因为后面有一个延时
+    s_axis_tdata_delay(
         .reset    	(aresetn     ),
         .clk      	(aclk       ),
         .in_valid 	(s_axis_tvalid  ),
@@ -475,23 +543,23 @@ module DPC_Detector #(
     LineBuf_dpc #(
         .WIDTH   	(WIDTH   ),
         .LATENCY 	(FRAME_WIDTH  ))
-    s_axit_tdata_linebuf_row_1(
+    s_axis_tdata_linebuf_row_1(
         .reset    	(aresetn     ),
         .clk      	(aclk       ),
-        .in_valid 	(m_axis_tvalid  ),
+        .in_valid 	(linebuf_m_valid  ),
         .data_in  	(m_axis_tdata_reg   ),
-        .data_out 	( m_axis_tdata_reg_row_2)
+        .data_out 	( m_axis_tdata_reg_row_1)
     );
 
     LineBuf_dpc #(
         .WIDTH   	(WIDTH   ),
         .LATENCY 	(FRAME_WIDTH  ))
-    s_axit_tdata_linebuf_row_2(
+    s_axis_tdata_linebuf_row_2(
         .reset    	(aresetn     ),
         .clk      	(aclk       ),
-        .in_valid 	(m_axis_tvalid  ),
-        .data_in  	(m_axis_tdata_reg_row_2   ),
-        .data_out 	( m_axis_tdata_reg_row_1)
+        .in_valid 	(linebuf_m_valid  ),
+        .data_in  	(m_axis_tdata_reg_row_1   ),
+        .data_out 	( m_axis_tdata_reg_row_2)
     );
 
     reg [WIDTH-1:0] m_axis_tdata_reg_r [0:2];
@@ -514,33 +582,33 @@ module DPC_Detector #(
 
     wire [WIDTH-1:0] m_axis_tdata_reg_center;
 
-    assign m_axis_tdata_reg_center = m_axis_tdata_reg_row_2_r[1];
+    assign m_axis_tdata_reg_center = m_axis_tdata_reg_row_1_r[1];
     assign s_axis_tready = m_axis_tready;
-    assign m_axis_tvalid = delayed;
+    assign m_axis_tvalid = delayed && frame_end;
     assign m_axis_tdata = m_axis_tdata_reg_center;
     assign m_axis_tuser = (auto_bp_x == 0 && auto_bp_y == 0);
     assign m_axis_tlast = (auto_bp_x == frame_width - 1);
-    assign w11 = m_axis_tdata_reg_row_1_r[2];
-    assign w12 = m_axis_tdata_reg_row_1_r[1];
-    assign w13 = m_axis_tdata_reg_row_1_r[0];
-    assign w21 = m_axis_tdata_reg_row_2_r[2];
-    assign w23 = m_axis_tdata_reg_row_2_r[0];
-    assign w31 = m_axis_tdata_reg[2];
-    assign w32 = m_axis_tdata_reg[1];
-    assign w33 = m_axis_tdata_reg[0];
+    assign w11 = m_axis_tdata_reg_row_2_r[2];
+    assign w12 = m_axis_tdata_reg_row_2_r[1];
+    assign w13 = m_axis_tdata_reg_row_2_r[0];
+    assign w21 = m_axis_tdata_reg_row_1_r[2];
+    assign w23 = m_axis_tdata_reg_row_1_r[0];
+    assign w31 = m_axis_tdata_reg_r[2];
+    assign w32 = m_axis_tdata_reg_r[1];
+    assign w33 = m_axis_tdata_reg_r[0];
     
     
     // k值输出（带坏点标志位）
     assign k_out_tvalid = median_valid;
     assign k_out_tdata = {auto_bp_valid, k_center};
-    assign k11_vld = (!k11[K_WIDTH]);
-    assign k12_vld = (!k12[K_WIDTH]);
-    assign k13_vld = (!k13[K_WIDTH]);
-    assign k21_vld = (!k21[K_WIDTH]);
-    assign k23_vld = (!k23[K_WIDTH]);
-    assign k31_vld = (!k31[K_WIDTH]);
-    assign k32_vld = (!k32[K_WIDTH]);
-    assign k33_vld = (!k33[K_WIDTH]);
+    assign k11_vld = (!k11_flag_r[3]);
+    assign k12_vld = (!k12_flag_r[3]);
+    assign k13_vld = (!k13_flag_r[3]);
+    assign k21_vld = (!k21_flag_r[3]);
+    assign k23_vld = (!k23_flag_r[3]);
+    assign k31_vld = (!k31_flag_r[3]);
+    assign k32_vld = (!k32_flag_r[3]);
+    assign k33_vld = (!k33_flag_r[3]);
 
     // 状态输出
     assign frame_detection_done = frame_done_r;
