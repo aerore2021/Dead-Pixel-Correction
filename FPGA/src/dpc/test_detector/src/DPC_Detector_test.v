@@ -68,6 +68,13 @@ module DPC_Detector_test #(
     input  wire                     enable,          // 模块使能
     input  wire [K_WIDTH-1:0]       k_threshold,     // k值偏差阈值
     
+    // 手动坏点表接口
+    input  wire                     S_AXI_ACLK,
+    input  wire [MANUAL_BP_BIT-1:0] manual_bp_num,
+    input  wire                     manual_wen,
+    input  wire [MANUAL_BP_BIT-1:0] manual_waddr,
+    input  wire [31:0]              manual_wdata,
+    
     // 自动检测坏点输出接口
     output wire                     auto_bp_valid,    // 检测到坏点时有效
     output reg [CNT_WIDTH-1:0]      auto_bp_x,        // 坏点X坐标
@@ -128,6 +135,36 @@ module DPC_Detector_test #(
     // 手动坏点检测模块
     // ================================================================
     
+    wire manual_bp_match;
+    wire [CNT_WIDTH-1:0] manual_bp_x, manual_bp_y;
+    
+    Manual_BadPixel_Checker #(
+        .WIDTH_BITS(CNT_WIDTH),
+        .HEIGHT_BITS(CNT_WIDTH),
+        .BAD_POINT_NUM(MANUAL_BP_NUM),
+        .BAD_POINT_BIT(MANUAL_BP_BIT)
+    ) manual_checker (
+        .clk(aclk),
+        .rst_n(aresetn),
+        .S_AXI_ACLK(S_AXI_ACLK),
+        
+        // 当前处理位置
+        .current_x(x_cnt),
+        .current_y(y_cnt),
+        .frame_start(frame_start_pulse),
+        
+        // 手动坏点表配置
+        .bad_point_num(manual_bp_num),
+        .wen_lut(manual_wen),
+        .waddr_lut(manual_waddr),
+        .wdata_lut(manual_wdata),
+        
+        // 输出
+        .bad_pixel_match(manual_bp_match),
+        .next_bad_x(manual_bp_x),
+        .next_bad_y(manual_bp_y)
+    );
+    
     // ================================================================
     // k值窗口缓存 (3x3):LATENCY=FRAME_WIDTH*2+2
     // 扩展k值位宽，加入手动坏点标志位
@@ -135,7 +172,7 @@ module DPC_Detector_test #(
     
     // 为k值添加手动坏点标志位
     wire [K_WIDTH:0] k_with_manual_flag;  // 扩展1位用于标志位
-    assign k_with_manual_flag = {(k_axis_tdata == 'd0), k_axis_tdata}; // 手动要和输入的坐标对齐，以及加入DP检测
+    assign k_with_manual_flag = {manual_bp_match|(k_axis_tdata == 'd0), k_axis_tdata}; // 手动要和输入的坐标对齐，以及加入DP检测
     
     wire [K_WIDTH:0] k_line_buffer1;
     wire [K_WIDTH:0] k_line_buffer2;
@@ -390,24 +427,20 @@ module DPC_Detector_test #(
     assign bp_bram_enb = 1'b1;
     assign bp_bram_addrb = auto_bp_read_addr;
     
-    // // 坏点列表BRAM实例化
+    // 坏点列表BRAM实例化
     // BadPixel_List_BRAM #(
     //     .DATA_WIDTH(32),
     //     .ADDR_WIDTH(AUTO_BP_BIT),
     //     .DEPTH(AUTO_BP_NUM)
     // ) bp_list_bram (
     //     .clka(bp_bram_clka),
-    //     .ena(bp_bram_ena),
     //     .wea(bp_bram_wea),
     //     .addra(bp_bram_addra),
-    //     .dina(bp_bram_dina),
-    //     .douta(bp_bram_douta),
+    //     .dina(bp_bram_dina)
         
     //     .clkb(bp_bram_clkb),
     //     .enb(bp_bram_enb),
-    //     .web(1'b0),  // 读端口不写入
     //     .addrb(bp_bram_addrb),
-    //     .dinb(32'b0),
     //     .doutb(bp_bram_doutb)
     // );
     
