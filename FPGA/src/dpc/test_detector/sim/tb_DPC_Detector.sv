@@ -183,40 +183,49 @@ module tb_DPC_Detector();
         integer manual_bp_count;
         
         $display("=== Setting up Manual Bad Pixels ===");
+        $display("注意：按照行优先顺序配置，确保32位数值从小到大排序");
         
-        // 手动坏点1: 独立坏点位置 (1,5)
+        // 手动坏点按行列扫描顺序排列:
+        // 1. (x=5,y=2) → 32'h00020005
+        // 2. (x=5,y=3) → 32'h00030005  
+        // 3. (x=5,y=4) → 32'h00040005
+        // 4. (x=1,y=5) → 32'h00050001
+        
+        // 手动坏点1: (x=5,y=2)
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b1;
         manual_waddr = 7'h00;
-        manual_wdata = {16'd5, 16'd1}; // 先x后y, y=1, x=5
+        manual_wdata = {16'd2, 16'd5}; // y=2, x=5
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b0;
-        $display("Manual Bad Pixel 1: (%0d,%0d)", 5, 1);
+        $display("Manual Bad Pixel 1: (x=%0d,y=%0d), data=32'h%08h", 5, 2, {16'd2, 16'd5});
         
-        // 手动坏点2-4: 列相邻坏点 (5,2), (5,3), (5,4) 
+        // 手动坏点2: (x=5,y=3)
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b1;
         manual_waddr = 7'h01;
-        manual_wdata = {16'd5, 16'd2}; // 先x后y, y=2, x=5
+        manual_wdata = {16'd3, 16'd5}; // y=3, x=5
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b0;
-        $display("Manual Bad Pixel 2: (%0d,%0d)", 5, 2);
+        $display("Manual Bad Pixel 2: (x=%0d,y=%0d), data=32'h%08h", 5, 3, {16'd3, 16'd5});
         
+        // 手动坏点3: (x=5,y=4)
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b1;
         manual_waddr = 7'h02;
-        manual_wdata = {16'd5, 16'd3}; // 先x后y, y=3, x=5
+        manual_wdata = {16'd3, 16'd6}; // y=3, x=6
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b0;
-        $display("Manual Bad Pixel 3: (%0d,%0d)", 5, 3);
+        $display("Manual Bad Pixel 3: (x=%0d,y=%0d), data=32'h%08h", 6, 3, {16'd3, 16'd6});
         
+        // 手动坏点4: (x=1,y=5)
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b1;
         manual_waddr = 7'h03;
-        manual_wdata = {16'd5, 16'd4}; // y=4, x=5
+        manual_wdata = {16'd5, 16'd1}; // y=5, x=1
         @(posedge S_AXI_ACLK);
         manual_wen = 1'b0;
-        $display("Manual Bad Pixel 4: (%0d,%0d)", 5, 4);
+        $display("Manual Bad Pixel 4: (x=%0d,y=%0d), data=32'h%08h", 1, 5, {16'd5, 16'd1});
         
         // 设置手动坏点总数
         manual_bp_count = 4;
@@ -245,16 +254,18 @@ module tb_DPC_Detector();
         end
         
         // 设置手动坏点坐标记录（与setup_manual_bad_pixels()中的坐标保持一致）
+        // 注意：x=列坐标，y=行坐标，按照行优先扫描顺序排列
         manual_pixel_count = 4;
-        manual_pixel_x[0] = 1; manual_pixel_y[0] = 5; // 独立手动坏点
-        manual_pixel_x[1] = 5; manual_pixel_y[1] = 2; // 列相邻坏点1
-        manual_pixel_x[2] = 5; manual_pixel_y[2] = 3; // 列相邻坏点2  
-        manual_pixel_x[3] = 5; manual_pixel_y[3] = 4; // 列相邻坏点3
+        manual_pixel_x[0] = 5; manual_pixel_y[0] = 2; // 手动坏点1 (x=5,y=2)
+        manual_pixel_x[1] = 5; manual_pixel_y[1] = 3; // 手动坏点2 (x=5,y=3)
+        manual_pixel_x[2] = 5; manual_pixel_y[2] = 4; // 手动坏点3 (x=5,y=4)
+        manual_pixel_x[3] = 1; manual_pixel_y[3] = 5; // 手动坏点4 (x=1,y=5)
         
         // 随机生成3个自动检测坏点位置（避免边界和手动坏点位置）
-        bad_pixel_x[0] = 2; bad_pixel_y[0] = 3; // 第一个自动坏点
-        bad_pixel_x[1] = 6; bad_pixel_y[1] = 4; // 第二个自动坏点  
-        bad_pixel_x[2] = 8; bad_pixel_y[2] = 7; // 第三个自动坏点
+        // 注意：x=列坐标，y=行坐标
+        bad_pixel_x[0] = 2; bad_pixel_y[0] = 3; // 第一个自动坏点 (x=2,y=3)
+        bad_pixel_x[1] = 6; bad_pixel_y[1] = 4; // 第二个自动坏点 (x=6,y=4)
+        bad_pixel_x[2] = 8; bad_pixel_y[2] = 7; // 第三个自动坏点 (x=8,y=7)
         
         // 设置自动检测坏点数据
         for (i = 0; i < 3; i = i + 1) begin

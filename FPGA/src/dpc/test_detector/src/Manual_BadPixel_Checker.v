@@ -27,11 +27,25 @@ module Manual_BadPixel_Checker #(
 
     // 读地址和控制
     reg [BAD_POINT_BIT-1:0] raddr;
+    reg [BAD_POINT_BIT-1:0] next_raddr;
     wire re;
     reg re_frame_start;
     wire [31:0] rdata;
-    wire [WIDTH_BITS-1:0] bad_x = rdata[31:16];
-    wire [HEIGHT_BITS-1:0] bad_y = rdata[15:0];
+    wire [WIDTH_BITS-1:0] bad_y = rdata[31:16];
+    wire [HEIGHT_BITS-1:0] bad_x = rdata[15:0];
+    
+    // 预计算下一个读地址
+    always @(*) begin
+        if (frame_start && !re_frame_start) begin
+            next_raddr = 0;
+        end
+        else if (bad_pixel_match && raddr < bad_point_num) begin
+            next_raddr = raddr + 1;
+        end
+        else begin
+            next_raddr = raddr;
+        end
+    end
     
     // 读取控制逻辑
     always @(posedge clk or negedge rst_n) begin
@@ -41,30 +55,19 @@ module Manual_BadPixel_Checker #(
         end
         else begin
             re_frame_start <= frame_start;
-            
-            if (frame_start && !re_frame_start) begin
-                // 帧开始，重置读地址
-                raddr <= 0;
-            end
-            else if (bad_pixel_match && raddr < bad_point_num) begin
-                // 匹配到坏点，读取下一个
-                raddr <= raddr + 1;
-            end
+            raddr <= next_raddr;
         end
     end
     
     // 坏点匹配判断
     assign bad_pixel_match = (current_x == bad_x) && (current_y == bad_y) && (raddr < bad_point_num);
-    assign re = bad_pixel_match;
+    // BRAM读使能信号：always enable to support continuous reading
+    assign re = 1'b1;
     assign next_bad_x = bad_x;
     assign next_bad_y = bad_y;
     
     // BRAM例化
-    BRAM_BadPoint_Dual #(
-        .ADDR_WIDTH(BAD_POINT_BIT),
-        .DATA_WIDTH(32),
-        .DEPTH(BAD_POINT_NUM)
-    ) BRAM_inst (
+    BRAM_BadPoint_Dual BRAM_inst (
         .clka(S_AXI_ACLK),
         .wea(wen_lut),
         .addra(waddr_lut),
@@ -72,7 +75,6 @@ module Manual_BadPixel_Checker #(
         
         .clkb(clk),
         .enb(re),
-        .web(1'b0),
         .addrb(raddr),
         .doutb(rdata)
     );
