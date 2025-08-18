@@ -580,7 +580,7 @@ module DPC_Detector_test #(
 
     assign m_axis_tdata_reg_center = m_axis_tdata_reg_row_1_r[1];
     assign s_axis_tready = m_axis_tready;
-    assign m_axis_tvalid = delayed && frame_end;
+    assign m_axis_tvalid = delayed && ~frame_end;
     assign m_axis_tdata = m_axis_tdata_reg_center;
     assign m_axis_tuser = (auto_bp_x == 0 && auto_bp_y == 0);
     assign m_axis_tlast = (auto_bp_x == frame_width - 1);

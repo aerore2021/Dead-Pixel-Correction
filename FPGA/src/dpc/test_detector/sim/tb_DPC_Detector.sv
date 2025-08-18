@@ -183,7 +183,6 @@ module tb_DPC_Detector();
         integer manual_bp_count;
         
         $display("=== Setting up Manual Bad Pixels ===");
-        $display("注意：按照行优先顺序配置，确保32位数值从小到大排序");
         
         // 手动坏点按行列扫描顺序排列:
         // 1. (x=5,y=2) → 32'h00020005
@@ -258,7 +257,7 @@ module tb_DPC_Detector();
         manual_pixel_count = 4;
         manual_pixel_x[0] = 5; manual_pixel_y[0] = 2; // 手动坏点1 (x=5,y=2)
         manual_pixel_x[1] = 5; manual_pixel_y[1] = 3; // 手动坏点2 (x=5,y=3)
-        manual_pixel_x[2] = 5; manual_pixel_y[2] = 4; // 手动坏点3 (x=5,y=4)
+        manual_pixel_x[2] = 6; manual_pixel_y[2] = 3; // 手动坏点3 (x=6,y=3)
         manual_pixel_x[3] = 1; manual_pixel_y[3] = 5; // 手动坏点4 (x=1,y=5)
         
         // 随机生成3个自动检测坏点位置（避免边界和手动坏点位置）
@@ -486,10 +485,10 @@ module tb_DPC_Detector();
             end
             
             if (found) begin
-                $display("  ✓ Auto Bad Pixel %0d at (%0d,%0d) - Successfully Detected", 
+                $display("  Auto Bad Pixel %0d at (%0d,%0d) - Successfully Detected", 
                          i+1, bad_pixel_x[i], bad_pixel_y[i]);
             end else begin
-                $display("  ✗ Auto Bad Pixel %0d at (%0d,%0d) - NOT Detected", 
+                $display("  Auto Bad Pixel %0d at (%0d,%0d) - NOT Detected", 
                          i+1, bad_pixel_x[i], bad_pixel_y[i]);
             end
         end
@@ -510,10 +509,10 @@ module tb_DPC_Detector();
             end
             
             if (found) begin
-                $display("  ✓ Manual Bad Pixel %0d at (%0d,%0d) - Successfully Detected", 
+                $display(" Manual Bad Pixel %0d at (%0d,%0d) - Successfully Detected", 
                          i+1, manual_pixel_x[i], manual_pixel_y[i]);
             end else begin
-                $display("  ✗ Manual Bad Pixel %0d at (%0d,%0d) - NOT Detected", 
+                $display(" Manual Bad Pixel %0d at (%0d,%0d) - NOT Detected", 
                          i+1, manual_pixel_x[i], manual_pixel_y[i]);
             end
         end
@@ -562,11 +561,11 @@ module tb_DPC_Detector();
                  ((correct_auto_detections + correct_manual_detections) * 100.0) / total_expected);
         
         if ((correct_auto_detections + correct_manual_detections) == total_expected && false_positives == 0) begin
-            $display("🎉 PERFECT DETECTION! All bad pixels detected correctly with no false positives.");
+            $display("All bad pixels detected correctly with no false positives.");
         end else if ((correct_auto_detections + correct_manual_detections) == total_expected) begin
-            $display("✓ All expected bad pixels detected, but with some false positives.");
+            $display("All expected bad pixels detected, but with some false positives.");
         end else begin
-            $display("⚠ Some expected bad pixels were missed or falsely detected.");
+            $display("Some expected bad pixels were missed or falsely detected.");
         end
         
         $display("Detection Process Verification Completed");
