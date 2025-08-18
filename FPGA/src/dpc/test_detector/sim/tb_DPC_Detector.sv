@@ -254,7 +254,7 @@ module tb_DPC_Detector();
         detected_count = 0;
         forever begin
             @(posedge aclk);
-            if (auto_bp_valid) begin
+            if (s_axis_tvalid && auto_bp_valid) begin
                 detected_bp_list[detected_count*2] = auto_bp_x;
                 detected_bp_list[detected_count*2+1] = auto_bp_y;
                 detected_count = detected_count + 1;

@@ -308,11 +308,56 @@ module DPC_Detector_test #(
 
     localparam LATENCY_CENTER2MEDIAN = 4;
     reg [K_WIDTH:0] k_center_with_flag_r [0:3];
+    reg k11_flag_r [0:3];
+    reg k12_flag_r [0:3];
+    reg k13_flag_r [0:3];
+    reg k21_flag_r [0:3];
+    reg k23_flag_r [0:3];
+    reg k31_flag_r [0:3];
+    reg k32_flag_r [0:3];
+    reg k33_flag_r [0:3];
+
     always @(posedge aclk) begin
         k_center_with_flag_r[0] <= k22;
         k_center_with_flag_r[1] <= k_center_with_flag_r[0];
         k_center_with_flag_r[2] <= k_center_with_flag_r[1];
         k_center_with_flag_r[3] <= k_center_with_flag_r[2];
+
+        k11_flag_r[0] <= k11[K_WIDTH];
+        k12_flag_r[0] <= k12[K_WIDTH];
+        k13_flag_r[0] <= k13[K_WIDTH];
+        k21_flag_r[0] <= k21[K_WIDTH];
+        k23_flag_r[0] <= k23[K_WIDTH];
+        k31_flag_r[0] <= k31[K_WIDTH];
+        k32_flag_r[0] <= k32[K_WIDTH];
+        k33_flag_r[0] <= k33[K_WIDTH];
+
+        k11_flag_r[1] <= k11_flag_r[0];
+        k12_flag_r[1] <= k12_flag_r[0];
+        k13_flag_r[1] <= k13_flag_r[0];
+        k21_flag_r[1] <= k21_flag_r[0];
+        k23_flag_r[1] <= k23_flag_r[0];
+        k31_flag_r[1] <= k31_flag_r[0];
+        k32_flag_r[1] <= k32_flag_r[0];
+        k33_flag_r[1] <= k33_flag_r[0];
+
+        k11_flag_r[2] <= k11_flag_r[1];
+        k12_flag_r[2] <= k12_flag_r[1];
+        k13_flag_r[2] <= k13_flag_r[1];
+        k21_flag_r[2] <= k21_flag_r[1];
+        k23_flag_r[2] <= k23_flag_r[1];
+        k31_flag_r[2] <= k31_flag_r[1];
+        k32_flag_r[2] <= k32_flag_r[1];
+        k33_flag_r[2] <= k33_flag_r[1];
+
+        k11_flag_r[3] <= k11_flag_r[2];
+        k12_flag_r[3] <= k12_flag_r[2];
+        k13_flag_r[3] <= k13_flag_r[2];
+        k21_flag_r[3] <= k21_flag_r[2];
+        k23_flag_r[3] <= k23_flag_r[2];
+        k31_flag_r[3] <= k31_flag_r[2];
+        k32_flag_r[3] <= k32_flag_r[2];
+        k33_flag_r[3] <= k33_flag_r[2];
     end
     assign k_center_with_flag = k_center_with_flag_r[3];
     assign k_center = k_center_with_flag[K_WIDTH-1:0];
@@ -395,7 +440,7 @@ module DPC_Detector_test #(
             end
             
             if (delayed) begin
-                if (auto_bp_y == frame_height - 1) begin
+                if (auto_bp_x == frame_width - 1) begin
                     auto_bp_x <= 0;
                     auto_bp_y <= auto_bp_y + 1;
                 end
@@ -443,7 +488,7 @@ module DPC_Detector_test #(
 
     LineBuf_dpc #(
         .WIDTH   	(WIDTH   ),
-        .LATENCY 	(LATENCY_TOTAL-LATENCY_PADDING  ))
+        .LATENCY 	(LATENCY_TOTAL ))
     s_axis_tdata_delay(
         .reset    	(aresetn     ),
         .clk      	(aclk       ),
@@ -491,7 +536,7 @@ module DPC_Detector_test #(
         m_axis_tdata_reg_row_2_r[1] <= m_axis_tdata_reg_row_2_r[0];
         m_axis_tdata_reg_row_2_r[0] <= m_axis_tdata_reg_row_2;
     end
-
+    
     wire [WIDTH-1:0] m_axis_tdata_reg_center;
 
     assign m_axis_tdata_reg_center = m_axis_tdata_reg_row_2_r[1];
@@ -513,14 +558,14 @@ module DPC_Detector_test #(
     // k值输出（带坏点标志位）
     assign k_out_tvalid = median_valid;
     assign k_out_tdata = {auto_bp_valid, k_center};
-    assign k11_vld = (!k11[K_WIDTH]);
-    assign k12_vld = (!k12[K_WIDTH]);
-    assign k13_vld = (!k13[K_WIDTH]);
-    assign k21_vld = (!k21[K_WIDTH]);
-    assign k23_vld = (!k23[K_WIDTH]);
-    assign k31_vld = (!k31[K_WIDTH]);
-    assign k32_vld = (!k32[K_WIDTH]);
-    assign k33_vld = (!k33[K_WIDTH]);
+    assign k11_vld = (!k11_flag_r[3]);
+    assign k12_vld = (!k12_flag_r[3]);
+    assign k13_vld = (!k13_flag_r[3]);
+    assign k21_vld = (!k21_flag_r[3]);
+    assign k23_vld = (!k23_flag_r[3]);
+    assign k31_vld = (!k31_flag_r[3]);
+    assign k32_vld = (!k32_flag_r[3]);
+    assign k33_vld = (!k33_flag_r[3]);
 
     // 状态输出
     assign frame_detection_done = frame_done_r;
