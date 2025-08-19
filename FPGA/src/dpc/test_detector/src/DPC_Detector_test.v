@@ -462,7 +462,7 @@ module DPC_Detector_test #(
 
   reg [15:0] delay_total_cnt;
   reg frame_end;
-  wire delayed;
+  // wire delayed;
   wire padding_valid;
   wire linebuf_m_valid;
   wire [9:0] k_thres_mux;
@@ -527,14 +527,14 @@ module DPC_Detector_test #(
   assign auto_bp_valid = (k_center_with_flag[K_WIDTH]) | (k_center > k_median + k_thres_mux) | (k_center + k_thres_mux < k_median);
 
   
-  Manual_BadPixel_Checker_LineCache #(
+  Manual_BadPixel_Checker #(
                             .WIDTH_BITS(CNT_WIDTH),
                             .HEIGHT_BITS(CNT_WIDTH),
                             .BAD_POINT_NUM(MANUAL_BP_NUM),
                             .BAD_POINT_BIT(MANUAL_BP_BIT),
                             .IMAGE_WIDTH(FRAME_WIDTH),
                             .IMAGE_HEIGHT(FRAME_HEIGHT),
-                            .MAX_REGIONS_PER_LINE(16)  // 每行最多16个手动区域
+                            .MAX_REGIONS_PER_LINE(4)  // 每行最多16个手动区域
                           ) manual_checker (
                             .clk(aclk),
                             .rst_n(aresetn),

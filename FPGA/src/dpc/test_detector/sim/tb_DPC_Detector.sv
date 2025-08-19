@@ -102,7 +102,6 @@ module tb_DPC_Detector();
     integer detected_count;
     
     // 用于监控输出像素流的计数器
-    integer output_pixel_count;
     integer output_x_coord, output_y_coord;
     
     // 被测模块实例化
@@ -257,41 +256,41 @@ module tb_DPC_Detector();
         // 微弱坏点1: (9,7) - k值异常偏高
         test_image[7][9] = 2000 + 7 * 50 + 9 * 10;  // 正常的data值
         // 邻域的正常k值大约在2000+7*50+9*10±20 = 2440±20范围
-        // 设计该点k值为2640，与邻域差异约200，满足150<200<300
-        test_k_values[7][9] = 2640; 
+        // 设计该点k值比邻域k值高200，满足150<200<300
+        test_k_values[7][9] = (2000 + 7 * 50 + 9 * 10) + 200; 
         $display("微弱坏点1: (x=%0d,y=%0d), data=%0d, k=%0d", 
                  9, 7, test_image[7][9], test_k_values[7][9]);
-        $display("  预期邻域k值约为%0d±20，当前k值差异约为%0d", 
-                 2000 + 7 * 50 + 9 * 10, test_k_values[7][9] - (2000 + 7 * 50 + 9 * 10));
+        $display("  预期邻域k值约为%0d±20，k值比邻域高约%0d", 
+                 2000 + 7 * 50 + 9 * 10, 200);
         
         // 微弱坏点2: (7,9) - k值异常偏低  
         test_image[9][7] = 2000 + 9 * 50 + 7 * 10;  // 正常的data值
         // 邻域的正常k值大约在2000+9*50+7*10±20 = 2520±20范围
-        // 设计该点k值为2280，与邻域差异约240，满足150<240<300
-        test_k_values[9][7] = 2280;
+        // 设计该点k值比邻域k值低240，满足150<240<300
+        test_k_values[9][7] = (2000 + 9 * 50 + 7 * 10) - 240;
         $display("微弱坏点2: (x=%0d,y=%0d), data=%0d, k=%0d", 
                  7, 9, test_image[9][7], test_k_values[9][7]);
-        $display("  预期邻域k值约为%0d±20，当前k值差异约为%0d", 
-                 2000 + 9 * 50 + 7 * 10, (2000 + 9 * 50 + 7 * 10) - test_k_values[9][7]);
+        $display("  预期邻域k值约为%0d±20，k值比邻域低约%0d", 
+                 2000 + 9 * 50 + 7 * 10, 240);
         
         // 在手动区域2 [13:17][3:7] 中心(15,5)设置微弱坏点群
         // 微弱坏点3: (14,4) - k值异常偏高
         test_image[4][14] = 2000 + 4 * 50 + 14 * 10;  // 正常data值
-        test_k_values[4][14] = (2000 + 4 * 50 + 14 * 10) + 180; // k值偏高180
-        $display("微弱坏点3: (x=%0d,y=%0d), data=%0d, k=%0d, k值偏高%0d", 
+        test_k_values[4][14] = (2000 + 4 * 50 + 14 * 10) + 180; // k值比邻域k值高180
+        $display("微弱坏点3: (x=%0d,y=%0d), data=%0d, k=%0d, k值比邻域高%0d", 
                  14, 4, test_image[4][14], test_k_values[4][14], 180);
         
         // 微弱坏点4: (16,6) - k值异常偏低
         test_image[6][16] = 2000 + 6 * 50 + 16 * 10;  // 正常data值  
-        test_k_values[6][16] = (2000 + 6 * 50 + 16 * 10) - 220; // k值偏低220
-        $display("微弱坏点4: (x=%0d,y=%0d), data=%0d, k=%0d, k值偏低%0d", 
+        test_k_values[6][16] = (2000 + 6 * 50 + 16 * 10) - 220; // k值比邻域k值低220
+        $display("微弱坏点4: (x=%0d,y=%0d), data=%0d, k=%0d, k值比邻域低%0d", 
                  16, 6, test_image[6][16], test_k_values[6][16], 220);
         
         // 在手动区域3 [1:5][10:14] 中心(3,12)设置边界微弱坏点
         // 微弱坏点5: (2,11) - k值异常偏高
         test_image[11][2] = 2000 + 11 * 50 + 2 * 10;  // 正常data值
-        test_k_values[11][2] = (2000 + 11 * 50 + 2 * 10) + 170; // k值偏高170
-        $display("边界微弱坏点: (x=%0d,y=%0d), data=%0d, k=%0d, k值偏高%0d", 
+        test_k_values[11][2] = (2000 + 11 * 50 + 2 * 10) + 170; // k值比邻域k值高170
+        $display("边界微弱坏点: (x=%0d,y=%0d), data=%0d, k=%0d, k值比邻域高%0d", 
                  2, 11, test_image[11][2], test_k_values[11][2], 170);
         
         // 设置手动区域坐标记录（按照setup_manual_bad_pixels()中的新顺序）
@@ -315,32 +314,35 @@ module tb_DPC_Detector();
                     $display("Auto Bad Point %0d: Dead point, (x=%0d,y=%0d), data=0, k=0", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i]);
                 end
-                1: begin // 盲点 (k值异常大)
-                    test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 2000;
-                    test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = 
-                        test_image[bad_pixel_y[i]][bad_pixel_x[i]] + THRESHOLD_AUTO + 50;
-                    $display("Auto Bad Point %0d: Stuck point, (x=%0d,y=%0d), data=%0d, k=%0d", 
+                1: begin // 盲点 (k值异常大) - k值比邻域k值高350以上
+                    reg [15:0] expected_neighbor_k;
+                    test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 2000 + bad_pixel_y[i] * 50 + bad_pixel_x[i] * 10;
+                    expected_neighbor_k = test_image[bad_pixel_y[i]][bad_pixel_x[i]]; // 邻域k值约等于邻域图像值
+                    test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = expected_neighbor_k + THRESHOLD_AUTO + 50; // 比邻域k值高350
+                    $display("Auto Bad Point %0d: Stuck point, (x=%0d,y=%0d), data=%0d, k=%0d, k vs neighbor_k diff=+%0d", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i],
                              test_image[bad_pixel_y[i]][bad_pixel_x[i]],
-                             test_k_values[bad_pixel_y[i]][bad_pixel_x[i]]);
+                             test_k_values[bad_pixel_y[i]][bad_pixel_x[i]], THRESHOLD_AUTO + 50);
                 end
-                2: begin // 盲点 (k值异常小)
-                    test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 500;
-                    test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = 
-                        test_image[bad_pixel_y[i]][bad_pixel_x[i]] - THRESHOLD_AUTO - 50;
-                    $display("Auto Bad Point %0d: Stuck point, (x=%0d,y=%0d), data=%0d, k=%0d", 
+                2: begin // 盲点 (k值异常小) - k值比邻域k值低350以上
+                    reg [15:0] expected_neighbor_k;
+                    test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 2000 + bad_pixel_y[i] * 50 + bad_pixel_x[i] * 10;
+                    expected_neighbor_k = test_image[bad_pixel_y[i]][bad_pixel_x[i]]; // 邻域k值约等于邻域图像值
+                    test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = expected_neighbor_k - THRESHOLD_AUTO - 50; // 比邻域k值低350
+                    $display("Auto Bad Point %0d: Stuck point, (x=%0d,y=%0d), data=%0d, k=%0d, k vs neighbor_k diff=-%0d", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i],
                              test_image[bad_pixel_y[i]][bad_pixel_x[i]],
-                             test_k_values[bad_pixel_y[i]][bad_pixel_x[i]]);
+                             test_k_values[bad_pixel_y[i]][bad_pixel_x[i]], THRESHOLD_AUTO + 50);
                 end
             endcase
         end
         
         $display("Test data generated:");
-        $display("- 3 auto bad pixels for automatic detection (k vs neighbors > %0d)", THRESHOLD_AUTO);
-        $display("- 5 weak bad pixels in manual regions (%0d < k vs neighbors < %0d)", THRESHOLD_MANUAL, THRESHOLD_AUTO);
+        $display("- 3 auto bad pixels for automatic detection (k vs neighbor_k > %0d)", THRESHOLD_AUTO);
+        $display("- 5 weak bad pixels in manual regions (%0d < k vs neighbor_k < %0d)", THRESHOLD_MANUAL, THRESHOLD_AUTO);
         $display("- Manual regions will be processed with smaller threshold");
-        $display("- Weak bad pixels designed with k vs neighborhood differences in range [150,300]");
+        $display("- Weak bad pixels designed with k vs neighborhood k differences in range [150,300]");
+        $display("- Auto bad pixels designed with k vs neighborhood k differences > 350");
     end
     endtask
     
