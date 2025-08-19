@@ -87,7 +87,8 @@ module DPC_Detector_test #(
 
     // 检测状态
     output wire                     frame_detection_done,  // 帧检测完成
-    output wire [AUTO_BP_BIT-1:0]   detected_bp_count     // 当前帧检测到的坏点数量
+    output wire [AUTO_BP_BIT-1:0]   detected_bp_count,     // 当前帧检测到的坏点数量
+    output wire                     delayed                 // 延迟状态信号
   );
 
   localparam LATENCY_CENTER = FRAME_WIDTH + 1; // 从右下角到中心
@@ -464,7 +465,7 @@ module DPC_Detector_test #(
   wire delayed;
   wire padding_valid;
   wire linebuf_m_valid;
-  wire k_thres_mux;
+  wire [9:0] k_thres_mux;
 
   assign delayed = (delay_total_cnt > LATENCY_TOTAL_TO_CENTER);
   assign median_valid = (delay_total_cnt > LATENCY_TO_MEDIAN);
@@ -523,14 +524,17 @@ module DPC_Detector_test #(
   wire manual_bp_match;
   wire [CNT_WIDTH-1:0] manual_bp_x, manual_bp_y;
   assign k_thres_mux = (manual_bp_match) ? THRESHOLD_MANUAL : THRESHOLD_AUTO;
-  assign auto_bp_valid = (k_center_with_flag[K_WIDTH]) | (k_center > k_median + k_thres_mux) | (k_center < k_median - k_thres_mux);
+  assign auto_bp_valid = (k_center_with_flag[K_WIDTH]) | (k_center > k_median + k_thres_mux) | (k_center + k_thres_mux < k_median);
 
   
-  Manual_BadPixel_Checker #(
+  Manual_BadPixel_Checker_LineCache #(
                             .WIDTH_BITS(CNT_WIDTH),
                             .HEIGHT_BITS(CNT_WIDTH),
                             .BAD_POINT_NUM(MANUAL_BP_NUM),
-                            .BAD_POINT_BIT(MANUAL_BP_BIT)
+                            .BAD_POINT_BIT(MANUAL_BP_BIT),
+                            .IMAGE_WIDTH(FRAME_WIDTH),
+                            .IMAGE_HEIGHT(FRAME_HEIGHT),
+                            .MAX_REGIONS_PER_LINE(16)  // 每行最多16个手动区域
                           ) manual_checker (
                             .clk(aclk),
                             .rst_n(aresetn),
@@ -676,5 +680,6 @@ module DPC_Detector_test #(
   // 状态输出
   assign frame_detection_done = frame_done_r;
   assign detected_bp_count = bp_count;
+  assign delayed = (delay_total_cnt > LATENCY_TOTAL_TO_CENTER);  // 导出delayed信号
 
 endmodule
