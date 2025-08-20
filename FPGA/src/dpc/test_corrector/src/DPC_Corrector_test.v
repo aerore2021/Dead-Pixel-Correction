@@ -1,11 +1,9 @@
-
-
 module DPC_Corrector_test #(
     parameter WIDTH = 16,                    // 像素数据位宽
     parameter K_WIDTH = 16,                  // k值位宽
     parameter CNT_WIDTH = 10,                // 坐标计数器位宽
     parameter FRAME_HEIGHT = 512,            // 帧高度
-    parameter FRAME_WIDTH = 640,             // 帧宽度
+    parameter FRAME_WIDTH = 640              // 帧宽度
 )(
     // 时钟和复位
     input  wire                     aclk,
@@ -139,38 +137,66 @@ module DPC_Corrector_test #(
         else begin
             // step 1
             w11_r <= (is_1st_col) ? s_axis_tdata_w13 : (is_2nd_col ? s_axis_tdata_w12 : s_axis_tdata_w11);
-            w21_r <= (is_1st_col) ? s_axis_tdata_w23 : (is_2nd_col ? s_axis_tdata_w22 : s_axis_tdata_w21);
+            w21_r <= (is_1st_col) ? s_axis_tdata_w23 : (is_2nd_col ? s_axis_tdata : s_axis_tdata_w21);
             w31_r <= (is_1st_col) ? s_axis_tdata_w33 : (is_2nd_col ? s_axis_tdata_w32 : s_axis_tdata_w31);
 
             w12_r <= (is_1st_col) ? s_axis_tdata_w13 : (is_last_col ? s_axis_tdata_w11 : s_axis_tdata_w12);
-            w22_r <= (is_1st_col) ? s_axis_tdata_w23 : (is_last_col ? s_axis_tdata_w21 : s_axis_tdata);
+            // w22_r <= (is_1st_col) ? s_axis_tdata_w23 : (is_last_col ? s_axis_tdata_w21 : s_axis_tdata);
+            w22_r <= s_axis_tdata;
             w32_r <= (is_1st_col) ? s_axis_tdata_w33 : (is_last_col ? s_axis_tdata_w31 : s_axis_tdata_w32);
 
             w13_r <= (is_last_col) ? s_axis_tdata_w11 : (is_last_2nd_col ? s_axis_tdata_w12 : s_axis_tdata_w13);
-            w23_r <= (is_last_col) ? s_axis_tdata_w21 : (is_last_2nd_col ? s_axis_tdata_w22 : s_axis_tdata_w23);
+            w23_r <= (is_last_col) ? s_axis_tdata_w21 : (is_last_2nd_col ? s_axis_tdata : s_axis_tdata_w23);
             w33_r <= (is_last_col) ? s_axis_tdata_w31 : (is_last_2nd_col ? s_axis_tdata_w32 : s_axis_tdata_w33);
+            
+            k11_vld_r <= (is_1st_col) ? k13_vld : (is_2nd_col ? k12_vld : k11_vld);
+            k21_vld_r <= (is_1st_col) ? k23_vld : (is_2nd_col ? k_out_tdata[K_WIDTH] : k21_vld);
+            k31_vld_r <= (is_1st_col) ? k33_vld : (is_2nd_col ? k32_vld : k31_vld);
+
+            k12_vld_r <= (is_1st_col) ? k13_vld : (is_last_col ? k11_vld : k12_vld);
+            // k22_vld_r <= (is_1st_col) ? k23_vld : (is_last_col ? k21_vld : k_out_tdata[K_WIDTH]);
+            k22_vld_r <= k_out_tdata[K_WIDTH];
+            k32_vld_r <= (is_1st_col) ? k33_vld : (is_last_col ? k31_vld : k32_vld);
+
+            k13_vld_r <= (is_last_col) ? k11_vld : (is_last_2nd_col ? k12_vld : k13_vld);
+            k23_vld_r <= (is_last_col) ? k21_vld : (is_last_2nd_col ? k_out_tdata[K_WIDTH] : k23_vld);
+            k33_vld_r <= (is_last_col) ? k31_vld : (is_last_2nd_col ? k32_vld : k33_vld);
+
             // step 2
             w11 <= (is_1st_row_r) ? w31_r : (is_2nd_row_r ? w21_r : w11_r);
             w12 <= (is_1st_row_r) ? w32_r : (is_2nd_row_r ? w22_r : w12_r);
             w13 <= (is_1st_row_r) ? w33_r : (is_2nd_row_r ? w23_r : w13_r);
 
             w21 <= (is_1st_row_r) ? w31_r : (is_last_row_r ? w11_r : w21_r);
-            w22 <= (is_1st_row_r) ? w32_r : (is_last_row_r ? w12_r : w22_r);
+            // w22 <= (is_1st_row_r) ? w32_r : (is_last_row_r ? w12_r : w22_r);
+            w22 <= w22_r;
             w23 <= (is_1st_row_r) ? w33_r : (is_last_row_r ? w13_r : w23_r);
 
             w31 <= (is_last_row_r) ? w11_r : (is_last_2nd_row_r ? w21_r : w31_r);
             w32 <= (is_last_row_r) ? w12_r : (is_last_2nd_row_r ? w22_r : w32_r);
             w33 <= (is_last_row_r) ? w13_r : (is_last_2nd_row_r ? w23_r : w33_r);
             
+            k11_vld_r2 <= (is_1st_row_r) ? k31_vld_r : (is_2nd_row_r ? k21_vld_r : k11_vld_r);
+            k12_vld_r2 <= (is_1st_row_r) ? k32_vld_r : (is_2nd_row_r ? k22_vld_r : k12_vld_r);
+            k13_vld_r2 <= (is_1st_row_r) ? k33_vld_r : (is_2nd_row_r ? k23_vld_r : k13_vld_r);
+
+            k21_vld_r2 <= (is_1st_row_r) ? k31_vld_r : (is_last_row_r ? k11_vld_r : k21_vld_r);
+            // k22_vld_r2 <= (is_1st_row_r) ? k32_vld_r : (is_last_row_r ? k12_vld_r : k22_vld_r);
+            k22_vld_r2 <= k22_vld_r;
+            k23_vld_r2 <= (is_1st_row_r) ? k33_vld_r : (is_last_row_r ? k13_vld_r : k23_vld_r);
+
+            k31_vld_r2 <= (is_last_row_r) ? k11_vld_r : (is_last_2nd_row_r ? k21_vld_r : k31_vld_r);
+            k32_vld_r2 <= (is_last_row_r) ? k12_vld_r : (is_last_2nd_row_r ? k22_vld_r : k32_vld_r);
+            k33_vld_r2 <= (is_last_row_r) ? k13_vld_r : (is_last_2nd_row_r ? k23_vld_r : k33_vld_r);
+
             // 其他信号的延迟
             is_1st_row_r <= is_1st_row; is_2nd_row_r <= is_2nd_row; 
             is_last_row_r <= is_last_row; is_last_2nd_row_r <= is_last_2nd_row;
 
-            k11_vld_r <= k11_vld; k12_vld_r <= k12_vld; k13_vld_r <= k13_vld; k21_vld_r <= k21_vld; k22_vld_r <= k22_vld; k23_vld_r <= k23_vld; k31_vld_r <= k31_vld; k32_vld_r <= k32_vld; k33_vld_r <= k33_vld;
-            k11_vld_r2 <= k11_vld_r; k12_vld_r2 <= k12_vld_r; k13_vld_r2 <= k13_vld_r; k21_vld_r2 <= k21_vld_r; k22_vld_r2 <= k22_vld_r; k23_vld_r2 <= k23_vld_r; k31_vld_r2 <= k31_vld_r; k32_vld_r2 <= k32_vld_r; k33_vld_r2 <= k33_vld_r;
             data_valid_r <= data_valid; data_valid_r2 <= data_valid_r;
             k_out_tdata_r <= k_out_tdata; k_out_tdata_r2 <= k_out_tdata_r;
             t1_enable_r <= enable; t1_enable <= t1_enable_r;
+
         end
     end
 
@@ -210,11 +236,10 @@ module DPC_Corrector_test #(
             t2_data_valid <= 0;
             t2_center_bad <= 0;
             t2_center_pixel <= 0;
-            t2_valid_neighbor_count <= 0;
         end
         else begin
             t2_data_valid <= data_valid_r2;
-            t2_center_bad <= k_out_tdata_r2[K_WIDTH];
+            t2_center_bad <= !k_out_tdata_r2[K_WIDTH];
             t2_center_pixel <= w22;
             t2_enable <= t1_enable;
         end
@@ -240,35 +265,46 @@ module DPC_Corrector_test #(
 
     always @(posedge aclk) begin
         if (!aresetn) begin
-            for (int t3_i = 0; t3_i < LATENCY_MEAN; t3_i = t3_i + 1) begin
-                t3_data_valid_r[t3_i] <= 0;
-                t3_bp_corrected_r[t3_i] <= 0;
-                t3_original_pixel_r[t3_i] <= 'd0;
-                t3_pixel_mux_r[t3_i] <= 0;
-            end
+            t3_data_valid_r[0] <= 0;
+            t3_bp_corrected_r[0] <= 0;
+            t3_original_pixel_r[0] <= 'd0;
+            t3_pixel_mux_r[0] <= 0;
+
+            t3_data_valid_r[1] <= 0;
+            t3_bp_corrected_r[1] <= 0;
+            t3_original_pixel_r[1] <= 'd0;
+            t3_pixel_mux_r[1] <= 0;
+
+            t3_data_valid_r[2] <= 0;
+            t3_bp_corrected_r[2] <= 0;
+            t3_original_pixel_r[2] <= 'd0;
+            t3_pixel_mux_r[2] <= 0;
+
+            t3_data_valid_r[3] <= 0;
+            t3_bp_corrected_r[3] <= 0;
+            t3_original_pixel_r[3] <= 'd0;
+            t3_pixel_mux_r[3] <= 0;
         end
         else begin
             t3_data_valid_r[0] <= t2_data_valid;
             t3_bp_corrected_r[0] <= t2_bp_corrected;
-            t3_original_pixel_r[0] <= t2_original_pixel;
+            t3_original_pixel_r[0] <= t2_center_pixel;
             t3_pixel_mux_r[0] <= t2_pixel_mux;
 
-            for (int t3_j = 1; t3_j < LATENCY_MEAN; t3_j = t3_j + 1) begin
-                t3_data_valid_r[t3_j] <= t3_data_valid_r[t3_j-1];
-                t3_bp_corrected_r[t3_j] <= t3_bp_corrected_r[t3_j-1];
-                t3_original_pixel_r[t3_j] <= t3_original_pixel_r[t3_j-1];
-                t3_pixel_mux_r[t3_j] <= t3_pixel_mux_r[t3_j-1];
-            end
+            t3_data_valid_r[1] <= t3_data_valid_r[0];
+            t3_bp_corrected_r[1] <= t3_bp_corrected_r[0];
+            t3_original_pixel_r[1] <= t3_original_pixel_r[0];
+            t3_pixel_mux_r[1] <= t3_pixel_mux_r[0];
 
-            // 校正值选择
-            if (t2_center_bad && enable && t2_valid_neighbor_count > 0) begin
-                // 坏点用邻域均值校正
-                t3_output_pixel <= t2_neighbor_sum / t2_valid_neighbor_count; //得改成除法器
-            end
-            else begin
-                // 正常像素保持原值
-                t3_output_pixel <= t2_original_pixel;
-            end
+            t3_data_valid_r[2] <= t3_data_valid_r[1];
+            t3_bp_corrected_r[2] <= t3_bp_corrected_r[1];
+            t3_original_pixel_r[2] <= t3_original_pixel_r[1];
+            t3_pixel_mux_r[2] <= t3_pixel_mux_r[1];
+
+            t3_data_valid_r[3] <= t3_data_valid_r[2];
+            t3_bp_corrected_r[3] <= t3_bp_corrected_r[2];
+            t3_original_pixel_r[3] <= t3_original_pixel_r[2];
+            t3_pixel_mux_r[3] <= t3_pixel_mux_r[2];
         end
     end
 
@@ -277,10 +313,10 @@ module DPC_Corrector_test #(
     localparam LPM_NREPRESENTATION = "UNSIGNED";
     localparam LPM_PIPLINE = LATENCY_MEAN;
     localparam LPM_TYPE = "LPM_DIVIDE";
-    localparam LPM_WIDTHD = WIDTH+3;
-    localparam LPM_WIDTHN = WIDTH;
+    localparam LPM_WIDTHN = WIDTH+3;
+    localparam LPM_WIDTHD = 4;
     wire clken = 1'b1;
-    reg [WIDTH-1:0] t3_neighbor_vld_mean;
+    wire [WIDTH-1:0] t3_neighbor_vld_mean;
     
     lpm_divide #(
         .lpm_drepresentation 	(LPM_DREPRESENTATION    ),

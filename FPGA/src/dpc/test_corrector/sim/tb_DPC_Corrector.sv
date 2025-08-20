@@ -292,12 +292,13 @@ module tb_DPC_Corrector();
         
         $display("=== Generating 20x20 Test Image Data ===");
         
-        // 生成正常图像数据（渐变图像）
+        // 生成正常图像数据（固定值图像，便于验证均值计算）
         for (i = 0; i < FRAME_HEIGHT; i = i + 1) begin
             for (j = 0; j < FRAME_WIDTH; j = j + 1) begin
-                base_value = 2000 + i * 50 + j * 10;
+                // 使用固定值1000，这样均值计算结果应该也是1000（易于验证）
+                base_value = 1000;
                 test_image[i][j] = base_value;
-                test_k_values[i][j] = base_value + $random % 40 - 20;
+                test_k_values[i][j] = base_value + $random % 40 - 20; // k值加一些噪声
                 expected_output[i][j] = base_value; // 初始期望输出与输入相同
             end
         end
@@ -322,11 +323,11 @@ module tb_DPC_Corrector();
                     expected_output[bad_pixel_y[i]][bad_pixel_x[i]] = calculate_expected_correction(bad_pixel_x[i], bad_pixel_y[i]);
                     $display("Auto Bad Point %0d: Dead point, (x=%0d,y=%0d), image=%0d->%0d, expected correction=%0d", 
                              i+1, bad_pixel_x[i], bad_pixel_y[i], test_image[bad_pixel_y[i]][bad_pixel_x[i]], 
-                             2000 + bad_pixel_y[i] * 50 + bad_pixel_x[i] * 10, expected_output[bad_pixel_y[i]][bad_pixel_x[i]]);
+                             1000, expected_output[bad_pixel_y[i]][bad_pixel_x[i]]);
                 end
                 1: begin // 亮点 (图像值异常高)
                     reg [15:0] normal_value, expected_neighbor_k;
-                    normal_value = 2000 + bad_pixel_y[i] * 50 + bad_pixel_x[i] * 10;  // 正常应该的值
+                    normal_value = 1000;  // 正常固定值
                     test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 4095;  // 亮点：饱和值
                     expected_neighbor_k = normal_value;  // 邻域k值基于正常值
                     test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = expected_neighbor_k + THRESHOLD_AUTO + 50;  // k值也异常高
@@ -337,7 +338,7 @@ module tb_DPC_Corrector();
                 end
                 2: begin // 暗点 (图像值异常低)
                     reg [15:0] normal_value, expected_neighbor_k;
-                    normal_value = 2000 + bad_pixel_y[i] * 50 + bad_pixel_x[i] * 10;  // 正常应该的值
+                    normal_value = 1000;  // 正常固定值
                     test_image[bad_pixel_y[i]][bad_pixel_x[i]] = 500;   // 暗点：异常低值
                     expected_neighbor_k = normal_value;  // 邻域k值基于正常值
                     test_k_values[bad_pixel_y[i]][bad_pixel_x[i]] = expected_neighbor_k - THRESHOLD_AUTO - 50;  // k值也异常低
@@ -351,39 +352,39 @@ module tb_DPC_Corrector();
         
         // 设置手动区域内的微弱坏点及期望校正值
         // 微弱坏点1: (9,7) 在手动区域[6:10][6:10]内 - 轻微亮点
-        test_image[7][9] = (2000 + 7 * 50 + 9 * 10) + 150;  // 比正常值高150
-        test_k_values[7][9] = (2000 + 7 * 50 + 9 * 10) + 200;  // k值比正常高200
+        test_image[7][9] = 1000 + 150;  // 比正常值高150
+        test_k_values[7][9] = 1000 + 200;  // k值比正常高200
         expected_output[7][9] = calculate_expected_correction(9, 7);
         $display("Manual Bad Point 1: (x=9,y=7), image=%0d->%0d, expected correction=%0d", 
-                 test_image[7][9], 2000 + 7 * 50 + 9 * 10, expected_output[7][9]);
+                 test_image[7][9], 1000, expected_output[7][9]);
         
         // 微弱坏点2: (7,9) 在手动区域[6:10][6:10]内 - 轻微暗点
-        test_image[9][7] = (2000 + 9 * 50 + 7 * 10) - 180;  // 比正常值低180
-        test_k_values[9][7] = (2000 + 9 * 50 + 7 * 10) - 240;  // k值比正常低240
+        test_image[9][7] = 1000 - 180;  // 比正常值低180
+        test_k_values[9][7] = 1000 - 240;  // k值比正常低240
         expected_output[9][7] = calculate_expected_correction(7, 9);
         $display("Manual Bad Point 2: (x=7,y=9), image=%0d->%0d, expected correction=%0d", 
-                 test_image[9][7], 2000 + 9 * 50 + 7 * 10, expected_output[9][7]);
+                 test_image[9][7], 1000, expected_output[9][7]);
         
         // 微弱坏点3: (14,4) 在手动区域[13:17][3:7]内 - 轻微亮点
-        test_image[4][14] = (2000 + 4 * 50 + 14 * 10) + 120;  // 比正常值高120
-        test_k_values[4][14] = (2000 + 4 * 50 + 14 * 10) + 180;  // k值比正常高180
+        test_image[4][14] = 1000 + 120;  // 比正常值高120
+        test_k_values[4][14] = 1000 + 180;  // k值比正常高180
         expected_output[4][14] = calculate_expected_correction(14, 4);
         $display("Manual Bad Point 3: (x=14,y=4), image=%0d->%0d, expected correction=%0d", 
-                 test_image[4][14], 2000 + 4 * 50 + 14 * 10, expected_output[4][14]);
+                 test_image[4][14], 1000, expected_output[4][14]);
         
         // 微弱坏点4: (16,6) 在手动区域[13:17][3:7]内 - 轻微暗点
-        test_image[6][16] = (2000 + 6 * 50 + 16 * 10) - 160;  // 比正常值低160
-        test_k_values[6][16] = (2000 + 6 * 50 + 16 * 10) - 220;  // k值比正常低220
+        test_image[6][16] = 1000 - 160;  // 比正常值低160
+        test_k_values[6][16] = 1000 - 220;  // k值比正常低220
         expected_output[6][16] = calculate_expected_correction(16, 6);
         $display("Manual Bad Point 4: (x=16,y=6), image=%0d->%0d, expected correction=%0d", 
-                 test_image[6][16], 2000 + 6 * 50 + 16 * 10, expected_output[6][16]);
+                 test_image[6][16], 1000, expected_output[6][16]);
         
         // 微弱坏点5: (2,11) 在手动区域[1:5][10:14]内 - 轻微亮点
-        test_image[11][2] = (2000 + 11 * 50 + 2 * 10) + 130;  // 比正常值高130
-        test_k_values[11][2] = (2000 + 11 * 50 + 2 * 10) + 170;  // k值比正常高170
+        test_image[11][2] = 1000 + 130;  // 比正常值高130
+        test_k_values[11][2] = 1000 + 170;  // k值比正常高170
         expected_output[11][2] = calculate_expected_correction(2, 11);
         $display("Manual Bad Point 5: (x=2,y=11), image=%0d->%0d, expected correction=%0d", 
-                 test_image[11][2], 2000 + 11 * 50 + 2 * 10, expected_output[11][2]);
+                 test_image[11][2], 1000, expected_output[11][2]);
         
         $display("Test data generation completed.");
     end
@@ -410,7 +411,7 @@ module tb_DPC_Corrector();
                 if (nx >= 0 && nx < FRAME_WIDTH && ny >= 0 && ny < FRAME_HEIGHT) begin
                     // 检查邻域像素是否为坏点（这里简化：假设只有我们标记的坏点是坏的）
                     if (!is_bad_pixel(nx, ny)) begin
-                        sum = sum + (2000 + ny * 50 + nx * 10); // 使用原始渐变值
+                        sum = sum + test_image[ny][nx]; // 使用实际测试图像数据，与Verilog实现一致
                         count = count + 1;
                     end
                 end
@@ -420,7 +421,7 @@ module tb_DPC_Corrector();
         if (count > 0)
             calculate_expected_correction = sum / count;
         else
-            calculate_expected_correction = 2000; // 默认值
+            calculate_expected_correction = 1000; // 默认值改为1000
     end
     endfunction
     

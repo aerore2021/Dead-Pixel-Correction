@@ -47,11 +47,12 @@ puts "INFO: Project '$project_name' created successfully"
 
 # Add design files
 add_files -norecurse {
-    src/DPC_Corrector.v
+    src/DPC_Corrector_test.v
     src/DPC_Detector_test.v
     src/LineBuf_dpc.v
     src/Fast_Median_Calculator.v
     src/Manual_BadPixel_Checker.v
+    src/lpm_divide.v
 }
 
 # Add simulation files
@@ -60,15 +61,17 @@ add_files -fileset sim_1 -norecurse {
 }
 
 # Set file properties
-set_property file_type SystemVerilog [get_files src/DPC_Corrector.v]
-set_property file_type SystemVerilog [get_files src/DPC_Detector_test.v]
-set_property file_type SystemVerilog [get_files src/LineBuf_dpc.v]
-set_property file_type SystemVerilog [get_files src/Fast_Median_Calculator.v]
-set_property file_type SystemVerilog [get_files src/Manual_BadPixel_Checker.v]
+set_property file_type Verilog [get_files src/DPC_Corrector_test.v]
+set_property file_type Verilog [get_files src/DPC_Detector_test.v]
+set_property file_type Verilog [get_files src/LineBuf_dpc.v]
+set_property file_type Verilog [get_files src/Fast_Median_Calculator.v]
+set_property file_type Verilog [get_files src/Manual_BadPixel_Checker.v]
+set_property file_type Verilog [get_files src/lpm_divide.v]
+
 set_property file_type SystemVerilog [get_files sim/tb_DPC_Corrector.sv]
 
 # Set top modules
-set_property top DPC_Corrector_test [get_filesets sources_1]
+# Set top: simulation top is the testbench in sim_1. Leave sources_1 top unset to avoid conflicts.
 set_property top tb_DPC_Corrector [get_filesets sim_1]
 puts "INFO: Source files added successfully"
 
