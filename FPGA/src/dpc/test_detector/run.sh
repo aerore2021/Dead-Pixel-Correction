@@ -17,12 +17,12 @@ show_usage() {
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                  # Only create project"
-    echo "  $0 -s               # Create project and run synthesis (incremental)"
-    echo "  $0 -sim             # Create project and run simulation (incremental)"
-    echo "  $0 -a               # Create project and run all steps (incremental)"
-    echo "  $0 -f -s            # Force rebuild and run synthesis"
-    choe "  s0 -f -a           # Force rebuild and run all steps (synthesis + simulation)"
+    echo "  $0                  # Only create project if it doesn't exist"
+    echo "  $0 -s               # Run synthesis (create project if needed)"
+    echo "  $0 -sim             # Run simulation (create project if needed)"
+    echo "  $0 -a               # Run synthesis and simulation (create project if needed)"
+    echo "  $0 -f -s            # Force rebuild project and run synthesis"
+    echo "  $0 -f -a            # Force rebuild project and run all steps"
     echo ""
 }
 
@@ -153,34 +153,64 @@ fi
 echo "=========================================="
 
 # Execute operations if needed
-if [ "$NEED_PROJECT_REBUILD" = true ] || [ "$NEED_SYNTHESIS" = true ] || [ "$NEED_SIMULATION" = true ]; then
-    echo "Running project operations..."
+if [ "$NEED_PROJECT_REBUILD" = true ]; then
+    # Project needs to be rebuilt - use make.tcl
+    echo "Running project rebuild operations..."
 
-# Prepare arguments for make.tcl
-TCL_ARGS=""
+    # Prepare arguments for make.tcl
+    TCL_ARGS=""
     if [ "$NEED_SYNTHESIS" = true ] && [ "$NEED_SIMULATION" = true ]; then
-    TCL_ARGS="-all"
+        TCL_ARGS="-all"
     elif [ "$NEED_SYNTHESIS" = true ]; then
-    TCL_ARGS="-synthesis"
+        TCL_ARGS="-synthesis"
     elif [ "$NEED_SIMULATION" = true ]; then
-    TCL_ARGS="-simulation"
-fi
+        TCL_ARGS="-simulation"
+    fi
 
-# Run make.tcl with appropriate arguments
-if [ -n "$TCL_ARGS" ]; then
-    echo "Running: vivado -mode tcl -source make.tcl -tclargs $TCL_ARGS"
-    vivado -mode tcl -source make.tcl -tclargs $TCL_ARGS
-else
-    echo "Running: vivado -mode tcl -source make.tcl"
-    vivado -mode tcl -source make.tcl
-fi
+    # Run make.tcl with appropriate arguments
+    if [ -n "$TCL_ARGS" ]; then
+        echo "Running: vivado -mode tcl -source make.tcl -tclargs $TCL_ARGS"
+        vivado -mode tcl -source make.tcl -tclargs $TCL_ARGS
+    else
+        echo "Running: vivado -mode tcl -source make.tcl"
+        vivado -mode tcl -source make.tcl
+    fi
 
-if [ $? -ne 0 ]; then
-        echo "ERROR: Project operations failed!"
-    exit 1
-fi
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Project rebuild failed!"
+        exit 1
+    fi
 
-    echo "Project operations completed successfully!"
+    echo "Project rebuild completed successfully!"
+
+elif [ "$NEED_SYNTHESIS" = true ] || [ "$NEED_SIMULATION" = true ]; then
+    # Project exists, just run synthesis/simulation directly
+    echo "Running operations on existing project..."
+
+    # Run synthesis if needed
+    if [ "$NEED_SYNTHESIS" = true ]; then
+        echo "Running synthesis..."
+        echo "Running: vivado -mode tcl -source syn.tcl"
+        vivado -mode tcl -source syn.tcl
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Synthesis failed!"
+            exit 1
+        fi
+        echo "Synthesis completed successfully!"
+    fi
+
+    # Run simulation if needed
+    if [ "$NEED_SIMULATION" = true ]; then
+        echo "Running simulation..."
+        echo "Running: vivado -mode tcl -source sim.tcl"
+        vivado -mode tcl -source sim.tcl
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Simulation failed!"
+            exit 1
+        fi
+        echo "Simulation completed successfully!"
+    fi
+
 else
     echo "No operations needed - project is up-to-date!"
 fi
@@ -191,12 +221,12 @@ echo "=========================================="
 
 # Summary
 echo "Summary:"
-echo "  - Project: $([ "$NEED_PROJECT_REBUILD" = true ] && echo "rebuilt ✓" || echo "up-to-date ✓")"
+echo "  - Project: $([ "$NEED_PROJECT_REBUILD" = true ] && echo "rebuilt ✓" || echo "existing project used ✓")"
 if [ "$DO_SYNTHESIS" = true ]; then
-    echo "  - Synthesis: $([ "$NEED_SYNTHESIS" = true ] && echo "completed ✓" || echo "already done ✓")"
+    echo "  - Synthesis: $([ "$NEED_SYNTHESIS" = true ] && echo "completed ✓" || echo "skipped (no rebuild needed) ✓")"
 fi
 if [ "$DO_SIMULATION" = true ]; then
-    echo "  - Simulation: $([ "$NEED_SIMULATION" = true ] && echo "completed ✓" || echo "already done ✓")"
+    echo "  - Simulation: $([ "$NEED_SIMULATION" = true ] && echo "completed ✓" || echo "skipped (no rebuild needed) ✓")"
 fi
 
 echo "=========================================="
