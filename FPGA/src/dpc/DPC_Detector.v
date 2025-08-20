@@ -667,7 +667,7 @@ module DPC_Detector #(
 
   // k值输出（带坏点标志位）
   assign k_out_tvalid = median_valid;
-  assign k_out_tdata = {auto_bp_valid, k_center};
+  assign k_out_tdata = {!auto_bp_valid, k_center};
   assign k11_vld = (!k11_flag_r[3]);
   assign k12_vld = (!k12_flag_r[3]);
   assign k13_vld = (!k13_flag_r[3]);

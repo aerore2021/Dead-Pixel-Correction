@@ -129,7 +129,7 @@ module DpcTop_Separated #(
   wire [PIXEL_WIDTH-1:0]        det_to_corr_tdata;
   wire                          det_to_corr_tuser;
   wire                          det_to_corr_tlast;
-  
+
   // 3x3窗口像素信号
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w11;
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w12;
@@ -139,7 +139,7 @@ module DpcTop_Separated #(
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w31;
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w32;
   wire [PIXEL_WIDTH-1:0]        det_to_corr_w33;
-  
+
   // k值流信号（带坏点标志）
   wire                          det_to_corr_k_out_tvalid;
   wire [K_WIDTH:0]              det_to_corr_k_out_tdata;
@@ -195,7 +195,7 @@ module DpcTop_Separated #(
                            .waddr_lut         (manual_waddr_lut),
                            .rdata_lut         (manual_rdata_lut),
                            .raddr_lut         (manual_raddr_lut),
-                           
+
                            // 坏点检测状态和列表接口
                            .frame_detection_done(frame_detection_done),
                            .detected_bp_count   (detected_bp_count),
@@ -341,7 +341,7 @@ module DpcTop_Separated #(
                  .w31                        (det_to_corr_w31),
                  .w32                        (det_to_corr_w32),
                  .w33                        (det_to_corr_w33),
-                 
+
                  // k值输出流（带坏点标志）
                  .k_out_tvalid               (det_to_corr_k_out_tvalid),
                  .k_out_tdata                (det_to_corr_k_out_tdata),
@@ -400,17 +400,17 @@ module DpcTop_Separated #(
                   .s_axis_tdata               (det_to_corr_tdata),
                   .s_axis_tuser               (det_to_corr_tuser),
                   .s_axis_tlast               (det_to_corr_tlast),
-                  
+
                   // 3x3窗口像素输入
-                  .w11                        (det_to_corr_w11),
-                  .w12                        (det_to_corr_w12),
-                  .w13                        (det_to_corr_w13),
-                  .w21                        (det_to_corr_w21),
-                  .w23                        (det_to_corr_w23),
-                  .w31                        (det_to_corr_w31),
-                  .w32                        (det_to_corr_w32),
-                  .w33                        (det_to_corr_w33),
-                  
+                  .s_axis_tdata_w11           (det_to_corr_w11),
+                  .s_axis_tdata_w12           (det_to_corr_w12),
+                  .s_axis_tdata_w13           (det_to_corr_w13),
+                  .s_axis_tdata_w21           (det_to_corr_w21),
+                  .s_axis_tdata_w23           (det_to_corr_w23),
+                  .s_axis_tdata_w31           (det_to_corr_w31),
+                  .s_axis_tdata_w32           (det_to_corr_w32),
+                  .s_axis_tdata_w33           (det_to_corr_w33),
+
                   // k值输入流（带坏点标志）
                   .k_out_tvalid               (det_to_corr_k_out_tvalid),
                   .k_out_tdata                (det_to_corr_k_out_tdata),
