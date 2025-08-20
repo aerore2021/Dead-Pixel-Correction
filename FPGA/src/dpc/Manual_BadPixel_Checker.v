@@ -345,6 +345,13 @@ module Manual_BadPixel_Checker #(
                 
                 STATE_BUILD_LINE_CACHE: begin
                     // 处理BRAM读取延迟，等待一个时钟周期
+                    // 同时检查当前手动坐标是否影响正在构建的目标行
+                    if (affects_building_line && (next_line_region_count < MAX_REGIONS_PER_LINE)) begin
+                        // 添加到下一行缓存
+                        next_line_regions[next_line_region_count] <= {region_x_end, region_x_start};
+                        next_line_region_count <= next_line_region_count + 1;
+                    end
+                    
                     state <= STATE_SCAN_COORDS;
                     scan_addr <= scan_addr + 1;
                 end
@@ -402,19 +409,6 @@ module Manual_BadPixel_Checker #(
             endcase
         end
     end
-    
-    // 在STATE_BUILD_LINE_CACHE状态的下一个时钟周期处理数据
-    always @(posedge S_AXI_ACLK) begin
-        if (state == STATE_BUILD_LINE_CACHE) begin
-            // 检查当前手动坐标是否影响正在构建的目标行
-            if (affects_building_line && (next_line_region_count < MAX_REGIONS_PER_LINE)) begin
-                // 添加到下一行缓存
-                next_line_regions[next_line_region_count] <= {region_x_end, region_x_start};
-                next_line_region_count <= next_line_region_count + 1;
-            end
-        end
-    end
-    
     // 输出逻辑 - 只要不在IDLE状态就可以进行检测
     // 使用当前缓存进行检测，即使在后台更新缓存时也不中断检测
     // =============================================================================
@@ -448,15 +442,13 @@ module Manual_BadPixel_Checker #(
     
     // 原始坐标BRAM例化
     BRAM_BadPoint_Dual BRAM_coord (
-        .clka(S_AXI_ACLK),
-        .wea(wen_lut),
-        .addra(waddr_lut),
-        .dina(wdata_lut),
+        .clk(S_AXI_ACLK),
+        .we(wen_lut),
+        .waddr(waddr_lut),
+        .wdata_a(wdata_lut),
         
-        .clkb(S_AXI_ACLK),  
-        .enb(1'b1),
-        .addrb(scan_addr),
-        .doutb(coord_rdata)
+        .re(1'b1),
+        .raddr(scan_addr),
+        .rdata_b(coord_rdata)
     );
-
 endmodule
