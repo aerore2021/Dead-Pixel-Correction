@@ -1,10 +1,10 @@
-# MedFilter Project - CLI Simulation Script
+# DPC Corrector Project - CLI Simulation Script  
 # Compatible with Vivado 2021.1 and above
 # Usage: vivado -mode tcl -source sim.tcl
 # Note: This script requires the project to be created first
 
 # Author: Aero2021
-# Date: July 18, 2025
+# Date: August 19, 2025
 
 # Project configuration
 set project_name "DPC_Corrector_proj"
@@ -22,7 +22,7 @@ if {![file exists "$project_dir/$project_name/$project_name.xpr"]} {
 }
 
 puts "=========================================="
-puts "ContrastAdjust CLI Simulation"
+puts "DPC Corrector Integration Simulation"
 puts "=========================================="
 
 # Configure simulation settings
@@ -37,7 +37,7 @@ if {[catch {
     launch_simulation
     
     # Configure VCD output
-    set vcd_file "tb_DPC_Detector_simulation.vcd"
+    set vcd_file "tb_DPC_Corrector_simulation.vcd"
     puts "INFO: Configuring VCD output to: $vcd_file"
     
     # Restart simulation to ensure clean state and proper VCD recording
@@ -73,6 +73,6 @@ if {[catch {
 
 
 puts "=========================================="
-puts "CLI Simulation Finished"
+puts "DPC Corrector Simulation Finished"
 puts "=========================================="
 exit 0

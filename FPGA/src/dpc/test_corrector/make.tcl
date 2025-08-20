@@ -68,8 +68,8 @@ set_property file_type SystemVerilog [get_files src/Manual_BadPixel_Checker.v]
 set_property file_type SystemVerilog [get_files sim/tb_DPC_Corrector.sv]
 
 # Set top modules
-set_property top DPC_Detector [get_filesets sources_1]
-set_property top tb_DPC_Detector [get_filesets sim_1]
+set_property top DPC_Corrector_test [get_filesets sources_1]
+set_property top tb_DPC_Corrector [get_filesets sim_1]
 puts "INFO: Source files added successfully"
 
 # Generate DPC_Detector dedicated BRAM IP
