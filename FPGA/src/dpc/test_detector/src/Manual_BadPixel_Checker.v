@@ -343,7 +343,7 @@ module Manual_BadPixel_Checker #(
         .addra(waddr_lut),
         .dina(wdata_lut),
         
-        .clkb(clk),
+        .clkb(S_AXI_ACLK),
         .enb(1'b1),
         .addrb(scan_addr),
         .doutb(coord_rdata)
