@@ -10,7 +10,7 @@
  * > 输出的k是窗口的中心，而不是右下角
  */
 
-module DPC_Detector #(
+module DPC_Detector_test #(
     parameter WIDTH = 16,                    // 像素数据位宽
     parameter K_WIDTH = 16,                  // k值位宽
     parameter CNT_WIDTH = 10,                // 坐标计数器位宽
@@ -20,8 +20,8 @@ module DPC_Detector #(
     parameter AUTO_BP_BIT = 8,               // 自动检测坏点地址位宽
     parameter THRESHOLD_AUTO = 100,          // 自动检测阈值
     parameter THRESHOLD_MANUAL = 50,         // 手动检测小阈值
-    parameter FRAME_HEIGHT = 512,            // 帧高度
-    parameter FRAME_WIDTH = 640              // 帧宽度
+    parameter FRAME_HEIGHT = 32,            // 帧高度（扩展到32）
+    parameter FRAME_WIDTH = 32              // 帧宽度（扩展到32）
   )(
     // 时钟和复位
     input  wire                     aclk,
@@ -250,38 +250,38 @@ module DPC_Detector #(
     end
 
     else
-  begin
-    // step 1
-    k11_r <= (is_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[0];
-    k21_r <= (is_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[0];
-    k31_r <= (is_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[0];
+    begin
+      // step 1
+      k11_r <= (is_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[0];
+      k21_r <= (is_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[0];
+      k31_r <= (is_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[0];
 
-    k12_r <= k_line_buffer2_r[1];
-    k22_r <= k_line_buffer1_r[1];
-    k32_r <= k_axis_tdata_r[1];
+      k12_r <= k_line_buffer2_r[1];
+      k22_r <= k_line_buffer1_r[1];
+      k32_r <= k_axis_tdata_r[1];
 
-    k13_r <= (is_last_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[2];
-    k23_r <= (is_last_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[2];
-    k33_r <= (is_last_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[2];
-    // step 2
-    k11 <= (is_sec_row_r2) ? k21_r : k11_r;
-    k12 <= (is_sec_row_r2) ? k22_r : k12_r;
-    k13 <= (is_sec_row_r2) ? k23_r : k13_r;
+      k13_r <= (is_last_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[2];
+      k23_r <= (is_last_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[2];
+      k33_r <= (is_last_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[2];
+      // step 2
+      k11 <= (is_sec_row_r2) ? k21_r : k11_r;
+      k12 <= (is_sec_row_r2) ? k22_r : k12_r;
+      k13 <= (is_sec_row_r2) ? k23_r : k13_r;
 
-    k21 <= k21_r;
-    k22 <= k22_r;
-    k23 <= k23_r;
+      k21 <= k21_r;
+      k22 <= k22_r;
+      k23 <= k23_r;
 
-    k31 <= (is_last_sec_row_r2) ? k21_r : k31_r;
-    k32 <= (is_last_sec_row_r2) ? k22_r : k32_r;
-    k33 <= (is_last_sec_row_r2) ? k23_r : k33_r;
+      k31 <= (is_last_sec_row_r2) ? k21_r : k31_r;
+      k32 <= (is_last_sec_row_r2) ? k22_r : k32_r;
+      k33 <= (is_last_sec_row_r2) ? k23_r : k33_r;
 
-    is_sec_row_r <= is_sec_row;
-    is_sec_row_r2 <= is_sec_row_r;
-    is_last_sec_row_r <= is_last_sec_row;
-    is_last_sec_row_r2 <= is_last_sec_row_r;
-    is_sec_col_r <= is_sec_col;
-    is_last_sec_col_r <= is_last_sec_col;
+      is_sec_row_r <= is_sec_row;
+      is_sec_row_r2 <= is_sec_row_r;
+      is_last_sec_row_r <= is_last_sec_row;
+      is_last_sec_row_r2 <= is_last_sec_row_r;
+      is_sec_col_r <= is_sec_col;
+      is_last_sec_col_r <= is_last_sec_col;
     end
   end
 
@@ -667,7 +667,7 @@ module DPC_Detector #(
 
   // k值输出（带坏点标志位）
   assign k_out_tvalid = median_valid;
-  assign k_out_tdata = {!auto_bp_valid, k_center};
+  assign k_out_tdata = {auto_bp_valid, k_center};
   assign k11_vld = (!k11_flag_r[3]);
   assign k12_vld = (!k12_flag_r[3]);
   assign k13_vld = (!k13_flag_r[3]);

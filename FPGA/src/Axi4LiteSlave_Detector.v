@@ -80,7 +80,7 @@ module Axi4LiteSlave_Detector #(
   reg     [C_S_AXI_DATA_WIDTH-1:0] slv_reg2;
   reg     [C_S_AXI_DATA_WIDTH-1:0] slv_reg3;
   reg     [C_S_AXI_DATA_WIDTH-1:0] slv_reg4;
-  reg     [C_S_AXI_DATA_WIDTH-1:0] slv_reg5;
+  wire    [C_S_AXI_DATA_WIDTH-1:0] slv_reg5;  // 改为wire，组合逻辑赋值
   wire                             slv_reg_rden;
   wire                             slv_reg_wren;
   reg     [C_S_AXI_DATA_WIDTH-1:0] reg_data_out;
@@ -149,13 +149,13 @@ module Axi4LiteSlave_Detector #(
       slv_reg2 <= 0;
       slv_reg3 <= 0;
       slv_reg4 <= 0;
-      slv_reg5 <= 0;
+      // slv_reg5 删除，因为它是组合逻辑直接赋值
       wdata_lut <= 0;
       waddr_lut <= 0;
       wen_lut <= 0;
     end else begin
       // 自动更新状态寄存器
-      slv_reg3 <= {15'b0, frame_detection_done, detected_bp_count[15:0]};
+      slv_reg3 <= {15'b0, frame_detection_done, detected_bp_count[LUT_INDEX_WIDTH-1:0]};
       
       if (slv_reg_wren) begin
         if (axi_awaddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB] == 'd0) begin
@@ -267,12 +267,9 @@ module Axi4LiteSlave_Detector #(
     end
   end
 
-  // 坏点坐标读取逻辑
-  // 当软件读取REG5时，根据REG4中的地址读取对应的坏点坐标
-  always @(*) begin
-    // REG5直接返回从检测器读取的坏点数据
-    slv_reg5 <= auto_bp_read_data;
-  end
+  // 坐标读取逻辑
+  // REG5直接反映从检测器读取的坏点数据
+  assign slv_reg5 = auto_bp_read_data;
 
   // 用户逻辑输出
   assign go = slv_reg0[0];

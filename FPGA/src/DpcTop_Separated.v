@@ -14,7 +14,8 @@ module DpcTop_Separated #(
     parameter K_WIDTH = 16,
     parameter AXI_DATA_WIDTH   = 32,
     parameter AXI_ADDR_WIDTH   = 32,
-    parameter K_THRESHOLD_DEFAULT = 100,
+    parameter K_THRESHOLD_AUTO = 100,
+    parameter K_THRESHOLD_MANUAL = 50,
     parameter MAX_MANUAL_BP   = 128,
     parameter MAX_ALL_BP      = 128
   ) (
@@ -162,8 +163,7 @@ module DpcTop_Separated #(
 
   Axi4LiteSlave_Detector #(
                            .C_S_AXI_DATA_WIDTH(AXI_DATA_WIDTH),
-                           .C_S_AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
-                           .PIXEL_WIDTH  (PIXEL_WIDTH)
+                           .C_S_AXI_ADDR_WIDTH(AXI_ADDR_WIDTH)
                          ) detector_axi_inst (
                            .S_AXI_ACLK        (s00_axi_aclk),
                            .S_AXI_ARESETN     (s00_axi_aresetn),
@@ -211,8 +211,7 @@ module DpcTop_Separated #(
 
   Axi4LiteSlave_Corrector #(
                             .C_S_AXI_DATA_WIDTH(AXI_DATA_WIDTH),
-                            .C_S_AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
-                            .PIXEL_WIDTH  (PIXEL_WIDTH)
+                            .C_S_AXI_ADDR_WIDTH(AXI_ADDR_WIDTH)
                           ) corrector_axi_inst (
                             .S_AXI_ACLK        (s01_axi_aclk),
                             .S_AXI_ARESETN     (s01_axi_aresetn),
@@ -309,7 +308,8 @@ module DpcTop_Separated #(
                  .MANUAL_BP_BIT(7),
                  .AUTO_BP_NUM(MAX_ALL_BP),
                  .AUTO_BP_BIT(7),
-                 .THRESHOLD(K_THRESHOLD_DEFAULT),
+                 .THRESHOLD_AUTO(K_THRESHOLD_AUTO),
+                 .THRESHOLD_MANUAL(K_THRESHOLD_MANUAL),
                  .FRAME_HEIGHT(FRAME_HEIGHT),
                  .FRAME_WIDTH(FRAME_WIDTH)
                ) detector_inst (
@@ -388,8 +388,7 @@ module DpcTop_Separated #(
                   .K_WIDTH(16),
                   .CNT_WIDTH(10),
                   .FRAME_HEIGHT(FRAME_HEIGHT),
-                  .FRAME_WIDTH(FRAME_WIDTH),
-                  .LATENCY(2)
+                  .FRAME_WIDTH(FRAME_WIDTH)
                 ) corrector_inst (
                   .aclk                       (axis_aclk),
                   .aresetn                    (axis_aresetn),

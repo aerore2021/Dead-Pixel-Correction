@@ -26,7 +26,7 @@ puts "DPC Corrector Integration Simulation"
 puts "=========================================="
 
 # Configure simulation settings
-set run_time 10us
+set run_time 100us
 set_property -name {xsim.simulate.runtime} -value $run_time -objects [get_filesets sim_1]
 set_property -name {xsim.simulate.log_all_signals} -value {true} -objects [get_filesets sim_1]
 set_property -name {xsim.simulate.saif} -value {} -objects [get_filesets sim_1]

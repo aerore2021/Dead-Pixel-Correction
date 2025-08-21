@@ -10,7 +10,7 @@
  * > 输出的k是窗口的中心，而不是右下角
  */
 
-module DPC_Detector_test #(
+module DPC_Detector #(
     parameter WIDTH = 16,                    // 像素数据位宽
     parameter K_WIDTH = 16,                  // k值位宽
     parameter CNT_WIDTH = 10,                // 坐标计数器位宽
@@ -250,38 +250,38 @@ module DPC_Detector_test #(
     end
 
     else
-    begin
-      // step 1
-      k11_r <= (is_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[0];
-      k21_r <= (is_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[0];
-      k31_r <= (is_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[0];
+  begin
+    // step 1
+    k11_r <= (is_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[0];
+    k21_r <= (is_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[0];
+    k31_r <= (is_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[0];
 
-      k12_r <= k_line_buffer2_r[1];
-      k22_r <= k_line_buffer1_r[1];
-      k32_r <= k_axis_tdata_r[1];
+    k12_r <= k_line_buffer2_r[1];
+    k22_r <= k_line_buffer1_r[1];
+    k32_r <= k_axis_tdata_r[1];
 
-      k13_r <= (is_last_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[2];
-      k23_r <= (is_last_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[2];
-      k33_r <= (is_last_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[2];
-      // step 2
-      k11 <= (is_sec_row_r2) ? k21_r : k11_r;
-      k12 <= (is_sec_row_r2) ? k22_r : k12_r;
-      k13 <= (is_sec_row_r2) ? k23_r : k13_r;
+    k13_r <= (is_last_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[2];
+    k23_r <= (is_last_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[2];
+    k33_r <= (is_last_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[2];
+    // step 2
+    k11 <= (is_sec_row_r2) ? k21_r : k11_r;
+    k12 <= (is_sec_row_r2) ? k22_r : k12_r;
+    k13 <= (is_sec_row_r2) ? k23_r : k13_r;
 
-      k21 <= k21_r;
-      k22 <= k22_r;
-      k23 <= k23_r;
+    k21 <= k21_r;
+    k22 <= k22_r;
+    k23 <= k23_r;
 
-      k31 <= (is_last_sec_row_r2) ? k21_r : k31_r;
-      k32 <= (is_last_sec_row_r2) ? k22_r : k32_r;
-      k33 <= (is_last_sec_row_r2) ? k23_r : k33_r;
+    k31 <= (is_last_sec_row_r2) ? k21_r : k31_r;
+    k32 <= (is_last_sec_row_r2) ? k22_r : k32_r;
+    k33 <= (is_last_sec_row_r2) ? k23_r : k33_r;
 
-      is_sec_row_r <= is_sec_row;
-      is_sec_row_r2 <= is_sec_row_r;
-      is_last_sec_row_r <= is_last_sec_row;
-      is_last_sec_row_r2 <= is_last_sec_row_r;
-      is_sec_col_r <= is_sec_col;
-      is_last_sec_col_r <= is_last_sec_col;
+    is_sec_row_r <= is_sec_row;
+    is_sec_row_r2 <= is_sec_row_r;
+    is_last_sec_row_r <= is_last_sec_row;
+    is_last_sec_row_r2 <= is_last_sec_row_r;
+    is_sec_col_r <= is_sec_col;
+    is_last_sec_col_r <= is_last_sec_col;
     end
   end
 
@@ -558,31 +558,31 @@ module DPC_Detector_test #(
                           );
 
   // BRAM写入控制逻辑
-  reg bp_write_en;
-  always @(posedge aclk)
-  begin
-    if (!aresetn)
-    begin
-      bp_write_en <= 1'b0;
-    end
-    else
-    begin
-      // 检测到坏点且未超过最大数量时使能写入
-      bp_write_en <= delayed && auto_bp_valid && (bp_write_addr < AUTO_BP_NUM);
+  // reg bp_write_en;
+  // always @(posedge aclk)
+  // begin
+  //   if (!aresetn)
+  //   begin
+  //     bp_write_en <= 1'b0;
+  //   end
+  //   else
+  //   begin
+  //     // 检测到坏点且未超过最大数量时使能写入
+  //     bp_write_en <= delayed && auto_bp_valid && (bp_write_addr < AUTO_BP_NUM);
 
-      // 更新写地址和计数
-      if (bp_write_en)
-      begin
-        bp_write_addr <= bp_write_addr + 1;
-        bp_count <= bp_count + 1;
-      end
-    end
-  end
+  //     // 更新写地址和计数
+  //     if (bp_write_en)
+  //     begin
+  //       bp_write_addr <= bp_write_addr + 1;
+  //       bp_count <= bp_count + 1;
+  //     end
+  //   end
+  // end
 
-  assign bp_bram_wea = bp_write_en;
+  // assign bp_bram_wea = bp_write_en;
 
   // AXI读取坏点列表接口 - 添加边界检查
-  assign auto_bp_read_data = (auto_bp_read_addr < bp_count) ? bp_bram_doutb : 32'h0;
+  // assign auto_bp_read_data = (auto_bp_read_addr < bp_count) ? bp_bram_doutb : 32'h0;
 
 
   // ================================================================

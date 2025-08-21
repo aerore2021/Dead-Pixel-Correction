@@ -2,8 +2,8 @@ module DPC_Corrector_test #(
     parameter WIDTH = 16,                    // 像素数据位宽
     parameter K_WIDTH = 16,                  // k值位宽
     parameter CNT_WIDTH = 10,                // 坐标计数器位宽
-    parameter FRAME_HEIGHT = 512,            // 帧高度
-    parameter FRAME_WIDTH = 640              // 帧宽度
+    parameter FRAME_HEIGHT = 32,            // 帧高度（扩展到32）
+    parameter FRAME_WIDTH = 32              // 帧宽度（扩展到32）
 )(
     // 时钟和复位
     input  wire                     aclk,
