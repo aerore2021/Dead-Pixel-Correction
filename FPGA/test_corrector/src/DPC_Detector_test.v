@@ -303,14 +303,14 @@ module DPC_Detector_test #(
 
 
   reg [K_WIDTH-1:0] k_neighbors_vld [0:7];
-  integer k_vld_cnt;
+  integer k_vld_cnt, idx, i;
 
   always @(posedge aclk)
   begin
     if (!aresetn)
     begin
       k_vld_cnt = 0;
-      for (integer idx = 0; idx < 8; idx = idx + 1)
+      for ( idx = 0; idx < 8; idx = idx + 1)
       begin
         k_neighbors_vld[idx] <= 0;
       end
@@ -318,7 +318,7 @@ module DPC_Detector_test #(
     else
     begin
       k_vld_cnt = 0;
-      for (integer i = 0; i<8; i = i + 1)
+      for ( i = 0; i<8; i = i + 1)
       begin
         // 有效k值赋值，LATENCY_K_VLD = 1
         if (!k_neighbors[i][K_WIDTH])

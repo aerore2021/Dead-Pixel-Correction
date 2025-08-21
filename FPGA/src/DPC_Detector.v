@@ -250,38 +250,38 @@ module DPC_Detector #(
     end
 
     else
-  begin
-    // step 1
-    k11_r <= (is_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[0];
-    k21_r <= (is_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[0];
-    k31_r <= (is_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[0];
+    begin
+      // step 1
+      k11_r <= (is_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[0];
+      k21_r <= (is_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[0];
+      k31_r <= (is_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[0];
 
-    k12_r <= k_line_buffer2_r[1];
-    k22_r <= k_line_buffer1_r[1];
-    k32_r <= k_axis_tdata_r[1];
+      k12_r <= k_line_buffer2_r[1];
+      k22_r <= k_line_buffer1_r[1];
+      k32_r <= k_axis_tdata_r[1];
 
-    k13_r <= (is_last_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[2];
-    k23_r <= (is_last_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[2];
-    k33_r <= (is_last_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[2];
-    // step 2
-    k11 <= (is_sec_row_r2) ? k21_r : k11_r;
-    k12 <= (is_sec_row_r2) ? k22_r : k12_r;
-    k13 <= (is_sec_row_r2) ? k23_r : k13_r;
+      k13_r <= (is_last_sec_col_r) ? k_line_buffer2_r[1] : k_line_buffer2_r[2];
+      k23_r <= (is_last_sec_col_r) ? k_line_buffer1_r[1] : k_line_buffer1_r[2];
+      k33_r <= (is_last_sec_col_r) ? k_axis_tdata_r[1] : k_axis_tdata_r[2];
+      // step 2
+      k11 <= (is_sec_row_r2) ? k21_r : k11_r;
+      k12 <= (is_sec_row_r2) ? k22_r : k12_r;
+      k13 <= (is_sec_row_r2) ? k23_r : k13_r;
 
-    k21 <= k21_r;
-    k22 <= k22_r;
-    k23 <= k23_r;
+      k21 <= k21_r;
+      k22 <= k22_r;
+      k23 <= k23_r;
 
-    k31 <= (is_last_sec_row_r2) ? k21_r : k31_r;
-    k32 <= (is_last_sec_row_r2) ? k22_r : k32_r;
-    k33 <= (is_last_sec_row_r2) ? k23_r : k33_r;
+      k31 <= (is_last_sec_row_r2) ? k21_r : k31_r;
+      k32 <= (is_last_sec_row_r2) ? k22_r : k32_r;
+      k33 <= (is_last_sec_row_r2) ? k23_r : k33_r;
 
-    is_sec_row_r <= is_sec_row;
-    is_sec_row_r2 <= is_sec_row_r;
-    is_last_sec_row_r <= is_last_sec_row;
-    is_last_sec_row_r2 <= is_last_sec_row_r;
-    is_sec_col_r <= is_sec_col;
-    is_last_sec_col_r <= is_last_sec_col;
+      is_sec_row_r <= is_sec_row;
+      is_sec_row_r2 <= is_sec_row_r;
+      is_last_sec_row_r <= is_last_sec_row;
+      is_last_sec_row_r2 <= is_last_sec_row_r;
+      is_sec_col_r <= is_sec_col;
+      is_last_sec_col_r <= is_last_sec_col;
     end
   end
 
@@ -303,14 +303,14 @@ module DPC_Detector #(
 
 
   reg [K_WIDTH-1:0] k_neighbors_vld [0:7];
-  integer k_vld_cnt;
+  integer k_vld_cnt, idx, i;
 
   always @(posedge aclk)
   begin
     if (!aresetn)
     begin
       k_vld_cnt = 0;
-      for (integer idx = 0; idx < 8; idx = idx + 1)
+      for ( idx = 0; idx < 8; idx = idx + 1)
       begin
         k_neighbors_vld[idx] <= 0;
       end
@@ -318,7 +318,7 @@ module DPC_Detector #(
     else
     begin
       k_vld_cnt = 0;
-      for (integer i = 0; i<8; i = i + 1)
+      for ( i = 0; i<8; i = i + 1)
       begin
         // 有效k值赋值，LATENCY_K_VLD = 1
         if (!k_neighbors[i][K_WIDTH])

@@ -232,7 +232,7 @@ module Manual_BadPixel_Checker #(
     reg [3:0] current_line_region_count_sync_1, current_line_region_count_sync_2;
     reg [HEIGHT_BITS-1:0] current_cached_line_y_sync_1, current_cached_line_y_sync_2;
     reg [2:0] state_sync_1, state_sync_2;
-    
+    integer j, k;
     // 双级同步器将缓存信息同步到clk域
     always @(posedge clk) begin
         if (!rst_n) begin
@@ -243,7 +243,7 @@ module Manual_BadPixel_Checker #(
             state_sync_1 <= STATE_IDLE;
             state_sync_2 <= STATE_IDLE;
             
-            for (integer j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
+            for (j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
                 current_line_regions_sync[j] <= 20'h0;
             end
         end
@@ -260,7 +260,7 @@ module Manual_BadPixel_Checker #(
             
             // 同步缓存数据 (仅在状态稳定时更新)
             if (state_sync_1 == STATE_RUNNING) begin
-                for (integer j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
+                for ( j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
                     current_line_regions_sync[j] <= current_line_regions[j];
                 end
             end
@@ -284,13 +284,7 @@ module Manual_BadPixel_Checker #(
             // 该区间的匹配结果
             assign region_matches[i] = valid_region && x_in_range;
             
-            // 调试信息：当区域匹配时显示
-            always @(posedge clk) begin
-                if (valid_region && x_in_range && (state_sync_2 == STATE_RUNNING)) begin
-                    $display("[Time %0t] Region Match[%0d]: current_pos(%0d,%0d) in X[%0d:%0d]", 
-                             $time, i, current_x, current_y, region_start_x, region_end_x);
-                end
-            end
+            
         end
     endgenerate
     
@@ -311,7 +305,7 @@ module Manual_BadPixel_Checker #(
             initial_cache_built <= 0;
             
             // 清空双缓存
-            for (integer j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
+            for ( j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
                 current_line_regions[j] <= 20'h0;
                 next_line_regions[j] <= 20'h0;
             end
@@ -332,7 +326,7 @@ module Manual_BadPixel_Checker #(
                         initial_cache_built <= 0;
                         
                         // 清空下一行缓存
-                        for (integer j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
+                        for ( j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
                             next_line_regions[j] <= 20'h0;
                         end
                         
@@ -367,17 +361,11 @@ module Manual_BadPixel_Checker #(
                     // 将构建好的缓存切换为当前缓存
                     current_cached_line_y <= building_line_y;
                     current_line_region_count <= next_line_region_count;
-                    for (integer j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
+                    for ( j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
                         current_line_regions[j] <= next_line_regions[j];
                     end
                     
-                    // 调试信息：显示缓存切换
-                    $display("[Time %0t] Cache Swap: Y=%0d, region_count=%0d", 
-                             $time, building_line_y, next_line_region_count);
-                    for (integer k = 0; k < next_line_region_count; k = k + 1) begin
-                        $display("  Region[%0d]: X range [%0d:%0d]", 
-                                 k, next_line_regions[k][9:0], next_line_regions[k][19:10]);
-                    end
+                    
                     
                     cache_building <= 0;
                     
@@ -402,7 +390,7 @@ module Manual_BadPixel_Checker #(
                         next_line_region_count <= 0;
                         
                         // 清空下一行缓存
-                        for (integer j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
+                        for ( j = 0; j < MAX_REGIONS_PER_LINE; j = j + 1) begin
                             next_line_regions[j] <= 20'h0;
                         end
                         
