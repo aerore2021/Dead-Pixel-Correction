@@ -1,6 +1,5 @@
 function [DeadPixel_Lis, StuckPixel_Lis] = AutoDPC(hot_uniform, cold_uniform, hot_temp, cold_temp, thres)
-    % 暂时先假定hot_uniform和cold_uniform是可以用来判断坏点的，即为软核中的sub_value_max, sub_value_min
-    
+
     Dif = double(hot_uniform) - double(cold_uniform);
     Dif_temp = double(hot_temp) - double(cold_temp);
     Dif_temp = 1; % 这里假设Dif_temp为1，实际应用中需要根据具体情况计算

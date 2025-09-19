@@ -1,3 +1,4 @@
+% 暂时fpga没有实现
 function AllDP_Lis = ManualDPC(image_input, ManualPixel_input, thres_Med, AutoDP_Lis)
     [h, w] = size(image_input);
     AllDP_Lis = AutoDP_Lis; % 初始化所有坏点列表
