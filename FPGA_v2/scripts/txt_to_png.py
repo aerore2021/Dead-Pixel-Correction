@@ -49,17 +49,16 @@ def txt_to_png(txt_path, png_path, width, height, bit_width=14):
         # Convert to numpy array
         img_array = np.array(pixels, dtype=np.uint16).reshape((height, width))
         
-        # Scale to 8-bit for PNG
-        max_val = (1 << bit_width) - 1
-        img_array_8bit = (img_array.astype(np.float32) / max_val * 255).astype(np.uint8)
-        
-        # Create and save image
-        img = Image.fromarray(img_array_8bit, mode='L')
+        # Save as 16-bit PNG to preserve original pixel values
+        # No scaling - direct pixel values
+        img = Image.fromarray(img_array, mode='I;16')
         img.save(png_path)
         
         print(f"Successfully converted {txt_path} to {png_path}")
         print(f"Image dimensions: {width}x{height}")
         print(f"Total pixels: {len(pixels)}")
+        print(f"Pixel value range: {img_array.min()} - {img_array.max()}")
+        print(f"Saved as 16-bit PNG (original pixel values preserved)")
         
     except Exception as e:
         print(f"Error converting {txt_path}: {str(e)}")

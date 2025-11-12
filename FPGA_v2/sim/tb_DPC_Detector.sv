@@ -25,21 +25,21 @@
 module tb_DPC_Detector();
 
     // Parameters
-    parameter ROW              = 512;
-    parameter COL              = 640;
+    parameter ROW              = 288;
+    parameter COL              = 384;
     parameter AXIS_TDATA_WIDTH = 14;
     parameter AXI_DATA_WIDTH   = 32;
     parameter AXI_ADDR_WIDTH   = 32;
-    parameter CLK_PERIOD       = 10;  // 100MHz
-    parameter AXI_CLK_PERIOD   = 10;  // 100MHz
+    parameter CLK_PERIOD       = 20;  // 100MHz
+    parameter AXI_CLK_PERIOD   = 5;  // 100MHz
     
     // Bad pixel list: [row, col]
     // [29, 156; 82, 132; 82, 133; 83, 132; 83, 133]
     parameter NUM_BAD_PIXELS   = 5;
     
-    // Test image path
-    parameter IMAGE_INPUT_PATH  = "../../image_inputs/dpc_test_1/1.txt";
-    parameter IMAGE_OUTPUT_PATH = "../../FPGA_outputs/1_out.txt";
+    // Test image path (absolute path from project root)
+    parameter IMAGE_INPUT_PATH  = "D:/feizhileng/Dead-Pixel-Correction/FPGA_v2/image_inputs/dpc_test_8/1.txt";
+    parameter IMAGE_OUTPUT_PATH = "D:/feizhileng/Dead-Pixel-Correction/FPGA_v2/FPGA_outputs/8_out.txt";
     
     // Clock and Reset
     reg axis_aclk;
@@ -161,60 +161,6 @@ module tb_DPC_Detector();
         bad_pixels[4] = {16'd133, 16'd83};   // [83, 133] -> {col=133, row=83}
     end
     
-    // Task: AXI4-Lite Write Transaction
-    task axi_write;
-        input [AXI_ADDR_WIDTH-1:0] addr;
-        input [AXI_DATA_WIDTH-1:0] data;
-        begin
-            @(posedge s00_axi_aclk);
-            s00_axi_awaddr  = addr;
-            s00_axi_awprot  = 3'b000;
-            s00_axi_awvalid = 1'b1;
-            s00_axi_wdata   = data;
-            s00_axi_wstrb   = 4'hF;
-            s00_axi_wvalid  = 1'b1;
-            s00_axi_bready  = 1'b1;
-            
-            // Wait for write address ready
-            wait(s00_axi_awready);
-            @(posedge s00_axi_aclk);
-            s00_axi_awvalid = 1'b0;
-            
-            // Wait for write data ready
-            wait(s00_axi_wready);
-            @(posedge s00_axi_aclk);
-            s00_axi_wvalid  = 1'b0;
-            
-            // Wait for write response
-            wait(s00_axi_bvalid);
-            @(posedge s00_axi_aclk);
-            s00_axi_bready  = 1'b0;
-            
-            $display("[%0t] AXI Write: Addr=0x%08h, Data=0x%08h", $time, addr, data);
-        end
-    endtask
-    
-    // Task: Configure Bad Pixel List
-    task configure_bad_pixels;
-        integer i;
-        begin
-            $display("[%0t] Configuring bad pixel list...", $time);
-            
-            // Write bad pixel count to register 1 (address 0x04)
-            axi_write(32'h00000004, NUM_BAD_PIXELS);
-            
-            // Write each bad pixel coordinate to LUT
-            // LUT starts at address 0x08 (waddr_lut will subtract 'd4 in manual.v)
-            for (i = 0; i < NUM_BAD_PIXELS; i = i + 1) begin
-                axi_write(32'h00000008 + (i * 4), bad_pixels[i]);
-                $display("  Bad Pixel %0d: Row=%0d, Col=%0d (Data=0x%08h)", 
-                         i, bad_pixels[i][15:0], bad_pixels[i][31:16], bad_pixels[i]);
-            end
-            
-            $display("[%0t] Bad pixel list configured.", $time);
-        end
-    endtask
-    
     // Task: Load Image from File
     task load_image;
         integer i;
@@ -269,7 +215,7 @@ module tb_DPC_Detector();
             end
             
             @(posedge axis_aclk);
-            s_axis_tvalid = 1'b0;
+            s_axis_tvalid = 1'b1;
             s_axis_tuser  = 1'b0;
             s_axis_tlast  = 1'b0;
             
@@ -316,6 +262,7 @@ module tb_DPC_Detector();
     endtask
     
     // Main Test Sequence
+    integer i;
     initial begin
         // Initialize signals
         axis_aresetn     = 1'b0;
@@ -331,7 +278,7 @@ module tb_DPC_Detector();
         s00_axi_wdata    = 'd0;
         s00_axi_wstrb    = 4'h0;
         s00_axi_wvalid   = 1'b0;
-        s00_axi_bready   = 1'b0;
+        s00_axi_bready   = 1'b1;  // Always ready for response
         s00_axi_araddr   = 'd0;
         s00_axi_arprot   = 3'b000;
         s00_axi_arvalid  = 1'b0;
@@ -349,12 +296,57 @@ module tb_DPC_Detector();
         s00_axi_aresetn = 1'b1;
         #(CLK_PERIOD * 10);
         
+        // ============================================
         // Configure bad pixel list via AXI4-Lite
-        configure_bad_pixels();
+        // ============================================
+        $display("[%0t] Configuring bad pixel list...", $time);
+        
+        // Write bad pixel count to register at address 0x04
+        @(posedge s00_axi_aclk);
+        s00_axi_awaddr  = 32'h00000004;
+        s00_axi_awvalid = 1'b1;
+        s00_axi_wdata   = NUM_BAD_PIXELS;
+        s00_axi_wstrb   = 4'hF;
+        s00_axi_wvalid  = 1'b1;
+        @(posedge s00_axi_aclk);
+        while (!s00_axi_awready || !s00_axi_wready) @(posedge s00_axi_aclk);
+        s00_axi_awvalid = 1'b0;
+        s00_axi_wvalid  = 1'b0;
+        @(posedge s00_axi_aclk);
+        $display("[%0t] Written bad_point_num = %0d", $time, NUM_BAD_PIXELS);
+        
+        // Write each bad pixel coordinate
+        for (i = 0; i < NUM_BAD_PIXELS; i = i + 1) begin
+            @(posedge s00_axi_aclk);
+            s00_axi_awaddr  = 32'h00000010 + (i * 4);
+            s00_axi_awvalid = 1'b1;
+            s00_axi_wdata   = bad_pixels[i];
+            s00_axi_wstrb   = 4'hF;
+            s00_axi_wvalid  = 1'b1;
+            @(posedge s00_axi_aclk);
+            while (!s00_axi_awready || !s00_axi_wready) @(posedge s00_axi_aclk);
+            s00_axi_awvalid = 1'b0;
+            s00_axi_wvalid  = 1'b0;
+            @(posedge s00_axi_aclk);
+            $display("[%0t] Written bad pixel %0d: Row=%0d, Col=%0d (0x%08h) to addr 0x%08h", 
+                     $time, i, bad_pixels[i][15:0], bad_pixels[i][31:16], bad_pixels[i], 32'h00000010 + (i * 4));
+        end
+        
+        $display("[%0t] Bad pixel list configured.", $time);
         #(CLK_PERIOD * 10);
         
-        // Start processing (set GO bit)
-        axi_write(32'h00000000, 32'h00000001);
+        // Start processing (set GO bit at address 0x00)
+        @(posedge s00_axi_aclk);
+        s00_axi_awaddr  = 32'h00000000;
+        s00_axi_awvalid = 1'b1;
+        s00_axi_wdata   = 32'h00000001;
+        s00_axi_wstrb   = 4'hF;
+        s00_axi_wvalid  = 1'b1;
+        @(posedge s00_axi_aclk);
+        while (!s00_axi_awready || !s00_axi_wready) @(posedge s00_axi_aclk);
+        s00_axi_awvalid = 1'b0;
+        s00_axi_wvalid  = 1'b0;
+        @(posedge s00_axi_aclk);
         $display("[%0t] DPC processing started (GO=1)", $time);
         #(CLK_PERIOD * 10);
         
@@ -371,8 +363,18 @@ module tb_DPC_Detector();
         // Wait for processing to complete
         #(CLK_PERIOD * 100);
         
-        // Stop processing
-        axi_write(32'h00000000, 32'h00000000);
+        // Stop processing (clear GO bit)
+        @(posedge s00_axi_aclk);
+        s00_axi_awaddr  = 32'h00000000;
+        s00_axi_awvalid = 1'b1;
+        s00_axi_wdata   = 32'h00000000;
+        s00_axi_wstrb   = 4'hF;
+        s00_axi_wvalid  = 1'b1;
+        @(posedge s00_axi_aclk);
+        while (!s00_axi_awready || !s00_axi_wready) @(posedge s00_axi_aclk);
+        s00_axi_awvalid = 1'b0;
+        s00_axi_wvalid  = 1'b0;
+        @(posedge s00_axi_aclk);
         $display("[%0t] DPC processing stopped (GO=0)", $time);
         
         #(CLK_PERIOD * 100);
@@ -395,8 +397,13 @@ module tb_DPC_Detector();
     always @(posedge axis_aclk) begin
         if (m_axis_tvalid && m_axis_tready) begin
             monitor_count = monitor_count + 1;
+            // Periodic progress report
             if (monitor_count % 1000 == 0) begin
                 $display("[%0t] Processed %0d pixels", $time, monitor_count);
+            end
+            // When output pixel count reaches full image size, notify
+            if (monitor_count == ROW * COL) begin
+                $display("[%0t] All output pixels received: %0d (== ROW*COL)", $time, monitor_count);
             end
         end
     end

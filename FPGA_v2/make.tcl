@@ -34,7 +34,7 @@ foreach arg $argv {
 # Project configuration
 set project_name "DPC_Detector_proj"
 set project_dir "."
-set fpga_part "xc7a100tcsg324-1"
+set fpga_part "xcku025-ffva1156-2-i"
 
 # Delete existing project
 if {[file exists "$project_dir/$project_name"]} {

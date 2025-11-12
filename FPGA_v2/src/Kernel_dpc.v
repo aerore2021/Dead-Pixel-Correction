@@ -71,7 +71,7 @@ module Kernel_dpc #(
 
   wire in_valid;
 
-  LineBuf #(
+  LineBuf_dpc #(
     .WIDTH(WIDTH+1),  // 只需要包含坏点标志，is_corrected在一级DPC中生成
     .LATENCY  (COL)
   ) linebuf_row1 (
@@ -82,7 +82,7 @@ module Kernel_dpc #(
     .data_out(linebuf_row1_data_out)
   );
 
-  LineBuf #(
+  LineBuf_dpc #(
     .WIDTH(WIDTH+1),  // 只需要包含坏点标志
     .LATENCY  (COL)
   ) linebuf_row2 (
@@ -206,47 +206,9 @@ module Kernel_dpc #(
 	);
 
 
-  // fsm
-  reg [2:0] state;
-  localparam s_stop = 0;
-  localparam s_go = 1;
-  localparam s_need_to_go = 2;
-  localparam s_need_to_stop = 3;
-
-  wire ready_to_go;
-  wire ready_to_stop;
-  assign ready_to_go   = (state == s_go) | (state == s_need_to_stop);
-  assign ready_to_stop = (state == s_stop) | (state == s_need_to_go);
-
+ 
   always @(posedge axis_aclk) begin
     if (~axis_aresetn) begin
-      state <= s_stop;
-    end else begin
-      case (state)
-        s_stop: begin
-          if (go_rising) state <= s_need_to_go;
-        end
-        s_go: begin
-          if (go_falling) state <= s_need_to_stop;
-        end
-        s_need_to_go: begin
-          if (will_get_next_in_frame) state <= s_go;
-        end
-        s_need_to_stop: begin
-          if (will_put_next_out_frame) state <= s_stop;
-        end
-        default: begin
-          state <= s_need_to_stop;
-        end
-      endcase
-    end
-  end
-
-  always @(posedge axis_aclk) begin
-    if (~axis_aresetn) begin
-      hcnt <= 'd0;
-      vcnt <= 'd0;
-    end else if (~ready_to_go) begin
       hcnt <= 'd0;
       vcnt <= 'd0;
     end else if (m_fire) begin
@@ -265,7 +227,6 @@ module Kernel_dpc #(
 
   always @(posedge axis_aclk) begin
     if (~axis_aresetn) initial_delay_cnt <= 'd0;
-    else if (~ready_to_go) initial_delay_cnt <= 'd0;
     else begin
       if (~initial_delayed & in_valid) initial_delay_cnt <= initial_delay_cnt + 'd1;
     end
@@ -319,7 +280,6 @@ module Kernel_dpc #(
   assign height                 = in_height;
 
   assign last_pixel_in_frame    = will_get_next_in_frame;
-  assign synced_go              = ready_to_go;
 
   // align edge indicators to filter function input
   wire     [CNT_WIDTH+CNT_WIDTH+4-1:0] shift_reg_in, shift_reg_out;

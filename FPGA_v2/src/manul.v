@@ -52,14 +52,14 @@ module manual #(
     assign re = re_frame_end | shift;
 
     BRAM_badpoint BRAM_badpoint_inst(
-        .re ( re),
-        .we ( wen_lut ),
-        .waddr ( waddr_lut-'d4 ),
-        .wdata_a ( wdata_lut ),
-        .rdata_b ( rdata ),
-        .raddr ( raddr ),
-        .wclk ( S_AXI_ACLK ),
-        .rclk ( clk )
+        .enb ( re),
+        .wea ( wen_lut ),
+        .addra ( waddr_lut-'d4 ),
+        .dina ( wdata_lut ),
+        .doutb ( rdata ),
+        .addrb ( raddr ),
+        .clka ( S_AXI_ACLK ),
+        .clkb ( clk )
     );
  
 

@@ -23,30 +23,41 @@ def png_to_txt(png_path, txt_path, bit_width=14):
         # Read PNG image
         img = Image.open(png_path)
         
-        # Convert to grayscale if necessary
-        if img.mode != 'L':
-            img = img.convert('L')
-        
-        # Get image dimensions
+        # Get image dimensions and mode
         width, height = img.size
         print(f"Image dimensions: {width}x{height}")
+        print(f"Image mode: {img.mode}")
         
         # Convert to numpy array
         img_array = np.array(img)
         
-        # Calculate max value based on bit width
-        max_val = (1 << bit_width) - 1
+        # Determine input bit depth
+        if img.mode == 'I;16' or img.mode == 'I':
+            # 16-bit grayscale image
+            print(f"Input: 16-bit image")
+        elif img.mode == 'L':
+            # 8-bit grayscale image
+            print(f"Input: 8-bit image")
+        else:
+            # Convert to grayscale
+            img = img.convert('L')
+            img_array = np.array(img)
+            print(f"Converted to grayscale")
         
-        # Scale pixel values to bit_width range
-        # Assuming input is 8-bit (0-255)
-        if bit_width != 8:
-            img_array = (img_array.astype(np.float32) / 255.0 * max_val).astype(np.uint16)
+        # No scaling - use original values
+        print(f"Writing original pixel values (no scaling)")
         
         # Write to text file (one pixel per line in hex format)
         with open(txt_path, 'w') as f:
             for row in img_array:
                 for pixel in row:
-                    f.write(f'{pixel:04X}\n')
+                    # Format based on bit_width (just for output format)
+                    if bit_width <= 8:
+                        f.write(f'{pixel:02X}\n')
+                    elif bit_width <= 16:
+                        f.write(f'{pixel:04X}\n')
+                    else:
+                        f.write(f'{pixel:08X}\n')
         
         print(f"Successfully converted {png_path} to {txt_path}")
         print(f"Total pixels: {width * height}")

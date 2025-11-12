@@ -192,15 +192,47 @@ module Filter_Function_dpc #(
 			mean_basic2_stg1 <= 0;
 		end
 		else if (in_valid) begin
+			// 水平/垂直方向比较: 优先选有效的,都有效时选差值小的
 			valid_dif_basic_direction1_stg1 <= valid_horizontal | valid_vertical;
+			if (!valid_horizontal && !valid_vertical) begin
+				dif_basic_direction1_stg1 <= {WIDTH{1'b1}};  // 都无效时置最大值
+				dir_type1_stg1 <= 1'b0;
+				mean_basic1_stg1 <= 0;
+			end else if (!valid_horizontal) begin
+				dif_basic_direction1_stg1 <= diff_vertical;
+				dir_type1_stg1 <= 1'b1;
+				mean_basic1_stg1 <= mean_vertical;
+			end else if (!valid_vertical) begin
+				dif_basic_direction1_stg1 <= diff_horizontal;
+				dir_type1_stg1 <= 1'b0;
+				mean_basic1_stg1 <= mean_horizontal;
+			end else begin
+				dif_basic_direction1_stg1 <= (diff_horizontal < diff_vertical) ? diff_horizontal : diff_vertical;
+				dir_type1_stg1 <= (diff_horizontal < diff_vertical) ? 1'b0 : 1'b1;
+				mean_basic1_stg1 <= (diff_horizontal < diff_vertical) ? mean_horizontal : mean_vertical;
+			end
+			
+			// 对角线1/对角线2方向比较: 优先选有效的,都有效时选差值小的
 			valid_dif_basic_direction2_stg1 <= valid_d1 | valid_d2;
-			dif_basic_direction1_stg1 <= (diff_horizontal < diff_vertical ? (valid_horizontal ? diff_horizontal : 0) : (valid_vertical ? diff_vertical : 0));
-			dif_basic_direction2_stg1 <= (diff_d1 < diff_d2 ? (valid_d1 ? diff_d1 : 0) : (valid_d2 ? diff_d2 : 0));
-			dir_type1_stg1 <= diff_horizontal < diff_vertical ? 1'b0 : 1'b1;
-			dir_type2_stg1 <= diff_d1 < diff_d2 ? 1'b0 : 1'b1;
+			if (!valid_d1 && !valid_d2) begin
+				dif_basic_direction2_stg1 <= {WIDTH{1'b1}};  // 都无效时置最大值
+				dir_type2_stg1 <= 1'b0;
+				mean_basic2_stg1 <= 0;
+			end else if (!valid_d1) begin
+				dif_basic_direction2_stg1 <= diff_d2;
+				dir_type2_stg1 <= 1'b1;
+				mean_basic2_stg1 <= mean_d2;
+			end else if (!valid_d2) begin
+				dif_basic_direction2_stg1 <= diff_d1;
+				dir_type2_stg1 <= 1'b0;
+				mean_basic2_stg1 <= mean_d1;
+			end else begin
+				dif_basic_direction2_stg1 <= (diff_d1 < diff_d2) ? diff_d1 : diff_d2;
+				dir_type2_stg1 <= (diff_d1 < diff_d2) ? 1'b0 : 1'b1;
+				mean_basic2_stg1 <= (diff_d1 < diff_d2) ? mean_d1 : mean_d2;
+			end
+			
 			basic_valid_num_stg1 <= valid_horizontal + valid_vertical + valid_d1 + valid_d2;
-			mean_basic1_stg1 <= diff_horizontal < diff_vertical ? (valid_horizontal ? mean_horizontal : 0) : (valid_vertical ? mean_vertical : 0);
-			mean_basic2_stg1 <= diff_d1 < diff_d2 ? (valid_d1 ? mean_d1 : 0) : (valid_d2 ? mean_d2 : 0);
 		end
 	end	
 
@@ -226,22 +258,85 @@ module Filter_Function_dpc #(
 			adjacent_mean1_stg1 <= 0; adjacent_mean2_stg1 <= 0; adjacent_mean3_stg1 <= 0; adjacent_mean4_stg1 <= 0;
 		end
 		else if (in_valid) begin
+			// 邻接方向组1: 左上+上 vs 右上+上
 			valid_dif_adjacent_direction1_stg1 <= valid_1112 | valid_1213;
+			if (!valid_1112 && !valid_1213) begin
+				dif_adjacent_direction1_stg1 <= {WIDTH{1'b1}};
+				dir_type1_adj_stg1 <= 1'b0;
+				adjacent_mean1_stg1 <= 0;
+			end else if (!valid_1112) begin
+				dif_adjacent_direction1_stg1 <= dif_adjacent_2;
+				dir_type1_adj_stg1 <= 1'b1;
+				adjacent_mean1_stg1 <= w23_uint_ex;
+			end else if (!valid_1213) begin
+				dif_adjacent_direction1_stg1 <= dif_adjacent_1;
+				dir_type1_adj_stg1 <= 1'b0;
+				adjacent_mean1_stg1 <= w21_uint_ex;
+			end else begin
+				dif_adjacent_direction1_stg1 <= (dif_adjacent_1 < dif_adjacent_2) ? dif_adjacent_1 : dif_adjacent_2;
+				dir_type1_adj_stg1 <= (dif_adjacent_1 < dif_adjacent_2) ? 1'b0 : 1'b1;
+				adjacent_mean1_stg1 <= (dif_adjacent_1 < dif_adjacent_2) ? w21_uint_ex : w23_uint_ex;
+			end
+			
+			// 邻接方向组2: 左下+下 vs 右下+下
 			valid_dif_adjacent_direction2_stg1 <= valid_3132 | valid_3233;
+			if (!valid_3132 && !valid_3233) begin
+				dif_adjacent_direction2_stg1 <= {WIDTH{1'b1}};
+				dir_type2_adj_stg1 <= 1'b0;
+				adjacent_mean2_stg1 <= 0;
+			end else if (!valid_3132) begin
+				dif_adjacent_direction2_stg1 <= dif_adjacent_4;
+				dir_type2_adj_stg1 <= 1'b1;
+				adjacent_mean2_stg1 <= w23_uint_ex;
+			end else if (!valid_3233) begin
+				dif_adjacent_direction2_stg1 <= dif_adjacent_3;
+				dir_type2_adj_stg1 <= 1'b0;
+				adjacent_mean2_stg1 <= w21_uint_ex;
+			end else begin
+				dif_adjacent_direction2_stg1 <= (dif_adjacent_3 < dif_adjacent_4) ? dif_adjacent_3 : dif_adjacent_4;
+				dir_type2_adj_stg1 <= (dif_adjacent_3 < dif_adjacent_4) ? 1'b0 : 1'b1;
+				adjacent_mean2_stg1 <= (dif_adjacent_3 < dif_adjacent_4) ? w21_uint_ex : w23_uint_ex;
+			end
+			
+			// 邻接方向组3: 左上+左 vs 左下+左
 			valid_dif_adjacent_direction3_stg1 <= valid_1121 | valid_2131;
+			if (!valid_1121 && !valid_2131) begin
+				dif_adjacent_direction3_stg1 <= {WIDTH{1'b1}};
+				dir_type3_adj_stg1 <= 1'b0;
+				adjacent_mean3_stg1 <= 0;
+			end else if (!valid_1121) begin
+				dif_adjacent_direction3_stg1 <= dif_adjacent_6;
+				dir_type3_adj_stg1 <= 1'b1;
+				adjacent_mean3_stg1 <= w32_uint_ex;
+			end else if (!valid_2131) begin
+				dif_adjacent_direction3_stg1 <= dif_adjacent_5;
+				dir_type3_adj_stg1 <= 1'b0;
+				adjacent_mean3_stg1 <= w12_uint_ex;
+			end else begin
+				dif_adjacent_direction3_stg1 <= (dif_adjacent_5 < dif_adjacent_6) ? dif_adjacent_5 : dif_adjacent_6;
+				dir_type3_adj_stg1 <= (dif_adjacent_5 < dif_adjacent_6) ? 1'b0 : 1'b1;
+				adjacent_mean3_stg1 <= (dif_adjacent_5 < dif_adjacent_6) ? w12_uint_ex : w32_uint_ex;
+			end
+			
+			// 邻接方向组4: 右上+右 vs 右下+右
 			valid_dif_adjacent_direction4_stg1 <= valid_1323 | valid_2333;
-			dif_adjacent_direction1_stg1 <= dif_adjacent_1 < dif_adjacent_2 ? (valid_1112 ? dif_adjacent_1 : 0) : (valid_1213 ? dif_adjacent_2 : 0);
-			dif_adjacent_direction2_stg1 <= dif_adjacent_3 < dif_adjacent_4 ? (valid_3132 ? dif_adjacent_3 : 0) : (valid_3233 ? dif_adjacent_4 : 0);
-			dif_adjacent_direction3_stg1 <= dif_adjacent_5 < dif_adjacent_6 ? (valid_1121 ? dif_adjacent_5 : 0) : (valid_2131 ? dif_adjacent_6 : 0);
-			dif_adjacent_direction4_stg1 <= dif_adjacent_7 < dif_adjacent_8 ? (valid_1323 ? dif_adjacent_7 : 0) : (valid_2333 ? dif_adjacent_8 : 0);
-			dir_type1_adj_stg1 <= dif_adjacent_1 < dif_adjacent_2 ? 1'b0 : 1'b1;
-			dir_type2_adj_stg1 <= dif_adjacent_3 < dif_adjacent_4 ? 1'b0 : 1'b1;
-			dir_type3_adj_stg1 <= dif_adjacent_5 < dif_adjacent_6 ? 1'b0 : 1'b1;
-			dir_type4_adj_stg1 <= dif_adjacent_7 < dif_adjacent_8 ? 1'b0 : 1'b1;
-			adjacent_mean1_stg1 <= dif_adjacent_1 < dif_adjacent_2 ? (valid_1112 ? w21_uint_ex : 0) : (valid_1213 ? w23_uint_ex : 0);
-			adjacent_mean2_stg1 <= dif_adjacent_3 < dif_adjacent_4 ? (valid_3132 ? w21_uint_ex : 0) : (valid_3233 ? w23_uint_ex : 0);
-			adjacent_mean3_stg1 <= dif_adjacent_5 < dif_adjacent_6 ? (valid_1121 ? w12_uint_ex : 0) : (valid_2131 ? w32_uint_ex : 0);
-			adjacent_mean4_stg1 <= dif_adjacent_7 < dif_adjacent_8 ? (valid_1323 ? w12_uint_ex : 0) : (valid_2333 ? w32_uint_ex : 0);
+			if (!valid_1323 && !valid_2333) begin
+				dif_adjacent_direction4_stg1 <= {WIDTH{1'b1}};
+				dir_type4_adj_stg1 <= 1'b0;
+				adjacent_mean4_stg1 <= 0;
+			end else if (!valid_1323) begin
+				dif_adjacent_direction4_stg1 <= dif_adjacent_8;
+				dir_type4_adj_stg1 <= 1'b1;
+				adjacent_mean4_stg1 <= w32_uint_ex;
+			end else if (!valid_2333) begin
+				dif_adjacent_direction4_stg1 <= dif_adjacent_7;
+				dir_type4_adj_stg1 <= 1'b0;
+				adjacent_mean4_stg1 <= w12_uint_ex;
+			end else begin
+				dif_adjacent_direction4_stg1 <= (dif_adjacent_7 < dif_adjacent_8) ? dif_adjacent_7 : dif_adjacent_8;
+				dir_type4_adj_stg1 <= (dif_adjacent_7 < dif_adjacent_8) ? 1'b0 : 1'b1;
+				adjacent_mean4_stg1 <= (dif_adjacent_7 < dif_adjacent_8) ? w12_uint_ex : w32_uint_ex;
+			end
 		end
 	end
 
@@ -261,10 +356,27 @@ module Filter_Function_dpc #(
 		end
 		else if (in_valid) begin
 			valid_dif_basic_direction_stg2 <= valid_dif_basic_direction1_stg1 | valid_dif_basic_direction2_stg1;
-			dif_basic_direction_stg2 <= ~valid_dif_basic_direction1_stg1 ? dif_basic_direction2_stg1 : (~valid_dif_basic_direction2_stg1 ? 'd0 : (dif_basic_direction1_stg1 < dif_basic_direction2_stg1 ? dif_basic_direction1_stg1 : dif_basic_direction2_stg1));
-			dir_type_stg2 <= dif_basic_direction1_stg1 < dif_basic_direction2_stg1 ? dir_type1_stg1 : dir_type2_stg1 + 'd2;
+			
+			// 基本方向最终比较: 优先选有效的,都有效时选差值小的
+			if (!valid_dif_basic_direction1_stg1 && !valid_dif_basic_direction2_stg1) begin
+				dif_basic_direction_stg2 <= {WIDTH{1'b1}};
+				dir_type_stg2 <= 2'b00;
+				mean_basic_stg2 <= 0;
+			end else if (!valid_dif_basic_direction1_stg1) begin
+				dif_basic_direction_stg2 <= dif_basic_direction2_stg1;
+				dir_type_stg2 <= dir_type2_stg1 + 2'd2;
+				mean_basic_stg2 <= mean_basic2_stg1;
+			end else if (!valid_dif_basic_direction2_stg1) begin
+				dif_basic_direction_stg2 <= dif_basic_direction1_stg1;
+				dir_type_stg2 <= dir_type1_stg1;
+				mean_basic_stg2 <= mean_basic1_stg1;
+			end else begin
+				dif_basic_direction_stg2 <= (dif_basic_direction1_stg1 < dif_basic_direction2_stg1) ? dif_basic_direction1_stg1 : dif_basic_direction2_stg1;
+				dir_type_stg2 <= (dif_basic_direction1_stg1 < dif_basic_direction2_stg1) ? dir_type1_stg1 : (dir_type2_stg1 + 2'd2);
+				mean_basic_stg2 <= (dif_basic_direction1_stg1 < dif_basic_direction2_stg1) ? mean_basic1_stg1 : mean_basic2_stg1;
+			end
+			
 			basic_valid_num_stg2 <= basic_valid_num_stg1;
-			mean_basic_stg2 <= dif_basic_direction1_stg1 < dif_basic_direction2_stg1 ? mean_basic1_stg1 : mean_basic2_stg1;
 		end
 	end
 
@@ -283,13 +395,39 @@ module Filter_Function_dpc #(
 			adjacent_mean2_stg2 <= 0;
 		end
 		else if (in_valid) begin
+			// 邻接方向组合1: 上方组 vs 下方组
 			valid_dif_adjacent_direction1_stg2 <= valid_dif_adjacent_direction1_stg1 | valid_dif_adjacent_direction2_stg1;
+			if (!valid_dif_adjacent_direction1_stg1 && !valid_dif_adjacent_direction2_stg1) begin
+				dif_adjacent_direction1_stg2 <= {WIDTH{1'b1}};
+				adjacent_mean1_stg2 <= 0;
+			end else if (!valid_dif_adjacent_direction1_stg1) begin
+				dif_adjacent_direction1_stg2 <= dif_adjacent_direction2_stg1;
+				adjacent_mean1_stg2 <= adjacent_mean2_stg1;
+			end else if (!valid_dif_adjacent_direction2_stg1) begin
+				dif_adjacent_direction1_stg2 <= dif_adjacent_direction1_stg1;
+				adjacent_mean1_stg2 <= adjacent_mean1_stg1;
+			end else begin
+				dif_adjacent_direction1_stg2 <= (dif_adjacent_direction1_stg1 < dif_adjacent_direction2_stg1) ? dif_adjacent_direction1_stg1 : dif_adjacent_direction2_stg1;
+				adjacent_mean1_stg2 <= (dif_adjacent_direction1_stg1 < dif_adjacent_direction2_stg1) ? adjacent_mean1_stg1 : adjacent_mean2_stg1;
+			end
+			
+			// 邻接方向组合2: 左侧组 vs 右侧组
 			valid_dif_adjacent_direction2_stg2 <= valid_dif_adjacent_direction3_stg1 | valid_dif_adjacent_direction4_stg1;
-			dif_adjacent_direction1_stg2 <= ~valid_dif_adjacent_direction1_stg1 ? dif_adjacent_direction2_stg1 : (~valid_dif_adjacent_direction2_stg1 ? 'd0 : (dif_adjacent_direction1_stg1 < dif_adjacent_direction2_stg1 ? dif_adjacent_direction1_stg1 : dif_adjacent_direction2_stg1));
-			dif_adjacent_direction2_stg2 <= ~valid_dif_adjacent_direction3_stg1 ? dif_adjacent_direction4_stg1 : (~valid_dif_adjacent_direction4_stg1 ? 'd0 : (dif_adjacent_direction3_stg1 < dif_adjacent_direction4_stg1 ? dif_adjacent_direction3_stg1 : dif_adjacent_direction4_stg1));
-			dir_type_adj_stg2 <= dif_adjacent_direction1_stg1 < dif_adjacent_direction2_stg1 ? (dir_type1_adj_stg1) : (dir_type2_adj_stg1 + 'd2);
-			adjacent_mean1_stg2 <= dif_adjacent_direction1_stg1 < dif_adjacent_direction2_stg1 ? adjacent_mean1_stg1 : adjacent_mean2_stg1;
-			adjacent_mean2_stg2 <= dif_adjacent_direction3_stg1 < dif_adjacent_direction4_stg1 ? adjacent_mean3_stg1 : adjacent_mean4_stg1;
+			if (!valid_dif_adjacent_direction3_stg1 && !valid_dif_adjacent_direction4_stg1) begin
+				dif_adjacent_direction2_stg2 <= {WIDTH{1'b1}};
+				adjacent_mean2_stg2 <= 0;
+			end else if (!valid_dif_adjacent_direction3_stg1) begin
+				dif_adjacent_direction2_stg2 <= dif_adjacent_direction4_stg1;
+				adjacent_mean2_stg2 <= adjacent_mean4_stg1;
+			end else if (!valid_dif_adjacent_direction4_stg1) begin
+				dif_adjacent_direction2_stg2 <= dif_adjacent_direction3_stg1;
+				adjacent_mean2_stg2 <= adjacent_mean3_stg1;
+			end else begin
+				dif_adjacent_direction2_stg2 <= (dif_adjacent_direction3_stg1 < dif_adjacent_direction4_stg1) ? dif_adjacent_direction3_stg1 : dif_adjacent_direction4_stg1;
+				adjacent_mean2_stg2 <= (dif_adjacent_direction3_stg1 < dif_adjacent_direction4_stg1) ? adjacent_mean3_stg1 : adjacent_mean4_stg1;
+			end
+			
+			dir_type_adj_stg2 <= (dif_adjacent_direction1_stg1 < dif_adjacent_direction2_stg1) ? dir_type1_adj_stg1 : (dir_type2_adj_stg1 + 2'd2);
 		end
 	end
 
@@ -307,9 +445,25 @@ module Filter_Function_dpc #(
 		end
 		else if (in_valid) begin
 			valid_dif_adjacent_direction_stg3 <= valid_dif_adjacent_direction1_stg2 | valid_dif_adjacent_direction2_stg2;
-			dif_adjacent_direction_stg3 <= ~valid_dif_adjacent_direction1_stg2 ? dif_adjacent_direction2_stg2 : (~valid_dif_adjacent_direction2_stg2 ? 'd0 : (dif_adjacent_direction1_stg2 < dif_adjacent_direction2_stg2 ? dif_adjacent_direction1_stg2 : dif_adjacent_direction2_stg2));
-			dir_type_adj_stg3 <= dif_adjacent_direction1_stg2 < dif_adjacent_direction2_stg2 ? dir_type_adj_stg2 : (dir_type_adj_stg2 + 'd4);
-			adjacent_mean_stg3 <= dif_adjacent_direction1_stg2 < dif_adjacent_direction2_stg2 ? adjacent_mean1_stg2 : adjacent_mean2_stg2;
+			
+			// 邻接方向最终比较
+			if (!valid_dif_adjacent_direction1_stg2 && !valid_dif_adjacent_direction2_stg2) begin
+				dif_adjacent_direction_stg3 <= {WIDTH{1'b1}};
+				dir_type_adj_stg3 <= 3'b000;
+				adjacent_mean_stg3 <= 0;
+			end else if (!valid_dif_adjacent_direction1_stg2) begin
+				dif_adjacent_direction_stg3 <= dif_adjacent_direction2_stg2;
+				dir_type_adj_stg3 <= dir_type_adj_stg2 + 3'd4;
+				adjacent_mean_stg3 <= adjacent_mean2_stg2;
+			end else if (!valid_dif_adjacent_direction2_stg2) begin
+				dif_adjacent_direction_stg3 <= dif_adjacent_direction1_stg2;
+				dir_type_adj_stg3 <= dir_type_adj_stg2;
+				adjacent_mean_stg3 <= adjacent_mean1_stg2;
+			end else begin
+				dif_adjacent_direction_stg3 <= (dif_adjacent_direction1_stg2 < dif_adjacent_direction2_stg2) ? dif_adjacent_direction1_stg2 : dif_adjacent_direction2_stg2;
+				dir_type_adj_stg3 <= (dif_adjacent_direction1_stg2 < dif_adjacent_direction2_stg2) ? dir_type_adj_stg2 : (dir_type_adj_stg2 + 3'd4);
+				adjacent_mean_stg3 <= (dif_adjacent_direction1_stg2 < dif_adjacent_direction2_stg2) ? adjacent_mean1_stg2 : adjacent_mean2_stg2;
+			end
 		end
 	end
 
@@ -352,13 +506,13 @@ module Filter_Function_dpc #(
 	end
 
 	// 输出选择器：如果中心是坏点，输出均值；否则输出原始值
-	reg [WIDTH-1+1:0] output_data;
+	reg [WIDTH-1:0] output_data;
 	always @ (posedge aclk or negedge aresetn) begin
 		if (!aresetn) begin
 			output_data <= 0;
 		end
 		else if (in_valid) begin
-			output_data <= w22_flag_delay[3] ? {w22_flag_delay[3], final_bp} : {w22_flag_delay[3], w22_delay[3]};
+			output_data <= w22_flag_delay[3] ? {final_bp} : {w22_delay[3]};
 		end
 	end
 
@@ -410,7 +564,7 @@ module Filter_Function_dpc #(
 	// 输出接口
 	assign out_hcnt = hcnt_r[LATENCY_FILTER_FUNC-1];
 	assign out_vcnt = vcnt_r[LATENCY_FILTER_FUNC-1];
-	assign out_valid = in_valid;
+	assign out_valid = in_valid_delay[LATENCY_FILTER_FUNC-1];
 
     // 边界值处理
     assign w11_uint_ex = is_first_row ? (is_first_column ? w22 : w21) : (is_first_column ? w12 : w11);

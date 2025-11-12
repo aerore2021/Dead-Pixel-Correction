@@ -34,13 +34,14 @@ module LineBuf_dpc #(
   end
 
   BRAM_32x1024 h_lut (
-    .clk    (clk),
-    .we     (in_valid),
-    .waddr  (waddr),
-    .wdata_a(data_in),
-    .re     (in_valid),
-    .raddr  (raddr),
-    .rdata_b(data_out)
+    .clka    (clk),
+    .clkb    (clk),
+    .wea     (in_valid),
+    .addra  (waddr),
+    .dina(data_in),
+    .enb     (in_valid),
+    .addrb  (raddr),
+    .doutb(data_out)
   );
 
 endmodule
