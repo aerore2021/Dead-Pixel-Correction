@@ -1,0 +1,2 @@
+Frame     MIN       MAX       Mid       Min5%     DR        DRC       ClipLimit Gmin      Alpha     
+1         7532      8096      7593      7569      564       538       100       5         1         

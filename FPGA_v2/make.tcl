@@ -1,0 +1,213 @@
+# MedFilter Project Creation Script
+# Compatible with Vivado 2021.1 and above
+# Usage: vivado -mode tcl -source make.tcl -tclargs [options]
+# Options: -synthesis, -simulation, -all
+# Author: Aero2021
+# Date: July 18, 2025
+
+# Parse command line arguments
+set do_synthesis false
+set do_simulation false
+
+# Process arguments
+foreach arg $argv {
+    switch -exact -- $arg {
+        "-synthesis" {
+            set do_synthesis true
+            puts "INFO: Synthesis will be run after project creation"
+        }
+        "-simulation" {
+            set do_simulation true
+            puts "INFO: Simulation will be run after project creation"
+        }
+        "-all" {
+            set do_synthesis true
+            set do_simulation true
+            puts "INFO: Both synthesis and simulation will be run"
+        }
+        default {
+            puts "WARNING: Unknown argument: $arg"
+        }
+    }
+}
+
+# Project configuration
+set project_name "DPC_Detector_proj"
+set project_dir "."
+set fpga_part "xc7a100tcsg324-1"
+
+# Delete existing project
+if {[file exists "$project_dir/$project_name"]} {
+    file delete -force "$project_dir/$project_name"
+}
+
+# Create new project
+create_project $project_name $project_dir/$project_name -part $fpga_part
+puts "INFO: Project '$project_name' created successfully"
+
+# Add design files
+add_files -norecurse {
+    src/DpcTop.v
+    src/Axi4LiteSlave_dpc.v
+    src/Kernel_dpc.v
+    src/Filter_Function_dpc.v
+    src/Window_dpc.v
+    src/LineBuf_dpc.v
+    src/manul.v
+}
+
+# Add simulation files
+add_files -fileset sim_1 -norecurse {
+    sim/tb_DPC_Detector.sv
+}
+
+# Set file properties
+set_property file_type SystemVerilog [get_files sim/tb_DPC_Detector.sv]
+
+# Set top modules
+set_property top DpcTop [get_filesets sources_1]
+set_property top tb_DPC_Detector [get_filesets sim_1]
+puts "INFO: Source files added successfully"
+
+# Generate DPC_Detector dedicated BRAM IP
+create_ip -name blk_mem_gen -vendor xilinx.com -library ip -version 8.4 -module_name BRAM_32x1024
+create_ip -name blk_mem_gen -vendor xilinx.com -library ip -version 8.4 -module_name BRAM_badpoint
+
+# Configure BRAM_32x1024 parameters - For line buffer
+set_property -dict [list \
+    CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
+    CONFIG.Write_Width_A {32} \
+    CONFIG.Write_Depth_A {1024} \
+    CONFIG.Read_Width_B {32} \
+    CONFIG.Enable_A {Always_Enabled} \
+    CONFIG.Enable_B {Use_ENB_Pin} \
+    CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
+    CONFIG.Use_Byte_Write_Enable {false} \
+    CONFIG.Byte_Size {9} \
+    CONFIG.Assume_Synchronous_Clk {false} \
+] [get_ips BRAM_32x1024]
+
+puts "INFO: BRAM IP 'BRAM_32x1024' configured successfully"
+
+# Generate IP - Wait for completion
+puts "INFO: Generating BRAM_32x1024 IP files..."
+generate_target all [get_ips BRAM_32x1024]
+create_ip_run [get_ips BRAM_32x1024]
+launch_runs BRAM_32x1024_synth_1
+wait_on_run BRAM_32x1024_synth_1
+
+if {[get_property PROGRESS [get_runs BRAM_32x1024_synth_1]] == "100%"} {
+    puts "INFO: BRAM_32x1024 IP generated successfully."
+} else {
+    puts "ERROR: BRAM_32x1024 IP generation failed. Please check the logs for details."
+    exit 1
+}
+
+# Configure BRAM_badpoint parameters - For bad pixel LUT
+set_property -dict [list \
+    CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
+    CONFIG.Write_Width_A {32} \
+    CONFIG.Write_Depth_A {128} \
+    CONFIG.Read_Width_B {32} \
+    CONFIG.Enable_A {Always_Enabled} \
+    CONFIG.Enable_B {Use_ENB_Pin} \
+    CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
+    CONFIG.Use_Byte_Write_Enable {false} \
+    CONFIG.Byte_Size {9} \
+    CONFIG.Assume_Synchronous_Clk {false} \
+] [get_ips BRAM_badpoint]
+
+puts "INFO: BRAM IP 'BRAM_badpoint' configured successfully"
+
+# Generate IP - Wait for completion
+puts "INFO: Generating BRAM_badpoint IP files..."
+generate_target all [get_ips BRAM_badpoint]
+create_ip_run [get_ips BRAM_badpoint]
+launch_runs BRAM_badpoint_synth_1
+wait_on_run BRAM_badpoint_synth_1
+
+if {[get_property PROGRESS [get_runs BRAM_badpoint_synth_1]] == "100%"} {
+    puts "INFO: BRAM_badpoint IP generated successfully."
+} else {
+    puts "ERROR: BRAM_badpoint IP generation failed. Please check the logs for details."
+    exit 1
+}
+
+# Refresh the project to ensure IP files are recognized
+update_compile_order -fileset sources_1
+puts "INFO: IP generation and project refresh completed"
+
+# Create constraints file
+set constraints_content {# DPC_Detector Project Clock Constraints
+create_clock -period 10.0 -name axis_aclk -waveform {0.000 5.000} [get_ports axis_aclk]
+create_clock -period 10.0 -name s00_axi_aclk -waveform {0.000 5.000} [get_ports s00_axi_aclk]
+
+# Set clock groups as asynchronous
+set_clock_groups -asynchronous -group [get_clocks axis_aclk] -group [get_clocks s00_axi_aclk]
+
+# Clock Uncertainty
+set_clock_uncertainty -setup 0.1 -hold 0.1 [get_clocks axis_aclk]
+set_clock_uncertainty -setup 0.1 -hold 0.1 [get_clocks s00_axi_aclk]
+
+# False Path Constraints for Reset
+set_false_path -from [get_ports axis_aresetn] -to [all_registers]
+set_false_path -from [get_ports s00_axi_aresetn] -to [all_registers]
+
+# Input/Output Delays
+set_input_delay -clock axis_aclk -max 2.0 [get_ports s_axis_*]
+set_input_delay -clock axis_aclk -min 0.5 [get_ports s_axis_*]
+set_output_delay -clock axis_aclk -max 2.0 [get_ports m_axis_*]
+set_output_delay -clock axis_aclk -min 0.5 [get_ports m_axis_*]
+
+set_input_delay -clock s00_axi_aclk -max 2.0 [get_ports s00_axi_*]
+set_input_delay -clock s00_axi_aclk -min 0.5 [get_ports s00_axi_*]
+}
+
+set constraints_file "$project_dir/$project_name/constraints.xdc"
+
+set file [open $constraints_file "w"]
+puts $file $constraints_content
+close $file
+
+add_files -fileset constrs_1 -norecurse $constraints_file
+puts "INFO: Constraints file created successfully"
+
+# Set synthesis strategy
+set_property strategy "Vivado Synthesis Defaults" [get_runs synth_1]
+set_property strategy "Vivado Implementation Defaults" [get_runs impl_1]
+
+# Update compile order
+update_compile_order -fileset sources_1
+update_compile_order -fileset sim_1
+
+# Verify IP files are present
+set ip_files [get_files -filter {FILE_TYPE == IP}]
+if {[llength $ip_files] > 0} {
+    puts "INFO: Found IP files: $ip_files"
+} else {
+    puts "WARNING: No IP files found in project"
+}
+
+puts "INFO: Project setup completed"
+puts "=========================================="
+puts "DPC Project Created Successfully!"
+puts "=========================================="
+puts "Project is ready for synthesis and simulation."
+puts "=========================================="
+
+# Execute additional steps based on arguments
+if {$do_synthesis && $do_simulation} {
+    puts "INFO: Running synthesis and simulation..."
+    source syn.tcl
+    source sim.tcl
+} elseif {$do_synthesis} {
+    puts "INFO: Running synthesis..."
+    source syn.tcl
+} elseif {$do_simulation} {
+    puts "INFO: Running simulation..."
+    source sim.tcl
+} else {
+    puts "INFO: Project creation completed. No additional steps requested."
+}
+
+puts "INFO: All requested operations completed successfully!"

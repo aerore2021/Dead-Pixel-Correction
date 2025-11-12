@@ -1,8 +1,8 @@
 clear;
 %% 初始化
-hot_uniform = imread('D:\FPGA\dpc\matlab_code\inputs\bendi_gaowen.png');
-cold_uniform = imread('D:\FPGA\dpc\matlab_code\inputs\bendi_diwen.png');
-image_input = imread('D:\FPGA\dpc\matlab_code\inputs\reader0.png');
+hot_uniform = imread('D:\feizhileng\Dead-Pixel-Correction\matlab_code\inputs\bendi_gaowen.png');
+cold_uniform = imread('D:\feizhileng\Dead-Pixel-Correction\matlab_code\inputs\bendi_diwen.png');
+image_input = imread('D:\feizhileng\Dead-Pixel-Correction\matlab_code\inputs\tf.png');
 hot_uniform = reshape(hot_uniform, 640, 512)';
 cold_uniform = reshape(cold_uniform, 640, 512)';
 %image_input = reshape(image_input, 640, 512)';
@@ -64,7 +64,7 @@ AutoDP_Lis = sortrows([DeadPixel_Lis; StuckPixel_Lis]);
 %% 手动检测坏点
 % 5x5的范围内标记一个坐标就行，让它尽量保持在中心
 % AutoDP_Lis = [];
-ManualPixel_Lis = [];
+ManualPixel_Lis = [30, 157; 83, 133; 83, 134; 84, 133; 84, 134];
 
 if ~isempty(ManualPixel_Lis)
     % 如果有手动标记的坏点，则进行手动坏点检测
@@ -75,7 +75,10 @@ else
 end
 
 %% 使用DPC算法修复坏点
-img_dpc = DPC(image_input, AllDP_Lis);
-figure; imshow(img_dpc,[]);
-% 输出坏点数量
+AllDP_Lis = ManualPixel_Lis;
+img_dpc = DPC_v2(image_input, AllDP_Lis, 50);
+figure; imshow(img_dpc,[]);title("去坏点结果");
+figure; imshow(image_input, []); title("输入");
+% 输出坏点数量    
 disp(['坏点数量: ', num2str(size(AllDP_Lis, 1))]);
+imwrite(img_dpc, "D:\feizhileng\Dead-Pixel-Correction\matlab_code\inputs\dpc.png");

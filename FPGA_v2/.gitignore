@@ -1,0 +1,51 @@
+# Vivado Project Files
+DPC_Detector_proj/
+*.jou
+*.log
+*.str
+*.xpr
+*.cache/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.srcs/
+
+# Waveform files
+*.wdb
+*.wcfg
+
+# Vivado temporary files
+.Xil/
+vivado*.backup.*
+hs_err_pid*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Output files
+FPGA_outputs/*.txt
+FPGA_outputs/png/*.png
+
+# Converted test images
+image_inputs/**/*.txt
+
+# Temporary files
+*.tmp
+*.bak
+*~
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
